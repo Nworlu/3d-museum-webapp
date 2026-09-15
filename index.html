@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Babylon Museum</title>
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+      html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #000; }
       #renderCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
       #crosshair {
         position: fixed; top: 50%; left: 50%; width: 6px; height: 6px;
@@ -21,9 +21,7 @@
     </style>
   </head>
   <body>
-    <canvas id="renderCanvas"></canvas>
-    <div id="crosshair"></div>
-    <div id="hint">Click to look around · WASD to walk · click an exhibit to inspect · Esc to release mouse</div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
