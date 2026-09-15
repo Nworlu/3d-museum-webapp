@@ -391,11 +391,16 @@ failure and its current coverage:
   `gltf-transform optimize --texture-compress ktx2` (T9). **Requires the
   KTX-Software CLI (`ktx`/`toktx`) installed on the machine separately**
   — it's a native binary gltf-transform shells out to, not an npm
-  package (see https://github.com/KhronosGroup/KTX-Software/releases).
-  Not yet run on the current placeholder exhibits (public Khronos sample
-  models this project doesn't own/host — re-encoding and re-hosting them
-  is out of scope for throwaway demo content); run it on real exhibit
-  assets once they exist. Real-device memory verification is tracked in
+  package (installer: https://github.com/KhronosGroup/KTX-Software/releases).
+  Verified end-to-end on 2026-09-16 (KTX-Software v4.4.2): a sample glTF
+  (120.48 KB) compressed to 46.18 KB with `KHR_texture_basisu` +
+  `EXT_meshopt_compression`, both natively supported by
+  `@babylonjs/loaders/glTF` — no additional Babylon-side work needed to
+  consume the output. Not yet run on the current placeholder exhibits
+  (public Khronos sample models this project doesn't own/host —
+  re-encoding and re-hosting them is out of scope for throwaway demo
+  content); run it on real exhibit assets once they exist. Real-device
+  memory verification is tracked in
   `TODOS.md`, not something this environment can perform.
 
 ## Implementation Tasks
