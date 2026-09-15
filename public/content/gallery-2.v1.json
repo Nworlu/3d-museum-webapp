@@ -1,0 +1,20 @@
+{
+  "exhibits": [
+    {
+      "id": "duck-reprise",
+      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb",
+      "position": { "x": -2, "y": 1, "z": 14 },
+      "scale": 1,
+      "title": "Untitled (Duck), Study II",
+      "description": "Same model URL as the lobby's Duck — exercises the AssetContainer cache (should not re-fetch)."
+    },
+    {
+      "id": "broken-exhibit",
+      "modelUrl": "https://example.invalid/does-not-exist.glb",
+      "position": { "x": 2, "y": 1, "z": 14 },
+      "scale": 1,
+      "title": "On Loan",
+      "description": "Deliberately broken URL — exercises the placeholder/404 path from the design doc's edge cases."
+    }
+  ]
+}

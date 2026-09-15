@@ -1,0 +1,20 @@
+{
+  "exhibits": [
+    {
+      "id": "duck",
+      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb",
+      "position": { "x": -2, "y": 1, "z": -6 },
+      "scale": 1,
+      "title": "Untitled (Duck)",
+      "description": "A classic glTF sample model, used as a placeholder exhibit while the real collection is authored."
+    },
+    {
+      "id": "boombox",
+      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoomBox/glTF-Binary/BoomBox.glb",
+      "position": { "x": 2, "y": 1, "z": -6 },
+      "scale": 40,
+      "title": "Boombox Study",
+      "description": "Placeholder exhibit — demonstrates a small, high-detail model scaled up for display."
+    }
+  ]
+}

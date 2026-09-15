@@ -1,0 +1,20 @@
+{
+  "exhibits": [
+    {
+      "id": "damaged-helmet",
+      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
+      "position": { "x": -2, "y": 1, "z": 4 },
+      "scale": 1,
+      "title": "Damaged Helmet",
+      "description": "Placeholder exhibit — a PBR-material test model, standing in for a real curated piece."
+    },
+    {
+      "id": "avocado",
+      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb",
+      "position": { "x": 2, "y": 1, "z": 4 },
+      "scale": 25,
+      "title": "Still Life Study",
+      "description": "Placeholder exhibit — demonstrates the same duck/boombox model reused across rooms would hit the asset cache; this one is a distinct model."
+    }
+  ]
+}
