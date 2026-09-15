@@ -32,3 +32,33 @@ this room's boundary" utility.
 **Priority:** P2
 **Depends on:** v1 shipped (needs `museum-manifest.json` boundary volumes
 and the `content/` schema to exist first).
+
+## Performance
+
+### Real-device KTX2 memory verification
+
+**What:** Run the museum on real low-end-target mobile devices (not just
+desktop Chrome) and measure peak GPU/texture memory during a room
+transition, once real (non-placeholder) exhibit assets exist. Confirm
+KTX2/Basis Universal textures (via `npm run optimize-model`) actually stay
+within budget, and specifically check for the transcode-time OOM risk
+documented in DESIGN.md's Feasibility research — smaller compressed bytes
+don't guarantee lower peak memory during decode.
+
+**Why:** T9 from the eng review's outside-voice pass (mobile GPU/texture
+memory was a feasibility risk taken for granted by omission in the
+original research). The KTX2 tooling is wired up
+(`npm run optimize-model`), but "the format choice is a mitigation" is not
+the same as "verified on real hardware" — no CI or headless-browser
+equivalent exists for this; it requires physical low-end devices.
+
+**Context:** Deferred because (1) the current exhibits are external public
+sample models this project doesn't own, so re-encoding them is throwaway
+work, and (2) no physical device was available in the environment this
+plan was built in. Do this once real exhibit assets exist and before
+calling mobile support "verified" rather than "designed for."
+
+**Effort:** S (once real assets + a device exist)
+**Priority:** P1
+**Depends on:** Real (non-placeholder) exhibit assets; access to a
+low-end-target physical device.

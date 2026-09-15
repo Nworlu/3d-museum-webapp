@@ -387,6 +387,16 @@ failure and its current coverage:
   memory budget on mobile — verify peak transcode memory on real
   low-end-target devices before locking this in as the only path (see
   Feasibility research).
+- Tooling: `npm run optimize-model -- <input.glb> <output.glb>` runs
+  `gltf-transform optimize --texture-compress ktx2` (T9). **Requires the
+  KTX-Software CLI (`ktx`/`toktx`) installed on the machine separately**
+  — it's a native binary gltf-transform shells out to, not an npm
+  package (see https://github.com/KhronosGroup/KTX-Software/releases).
+  Not yet run on the current placeholder exhibits (public Khronos sample
+  models this project doesn't own/host — re-encoding and re-hosting them
+  is out of scope for throwaway demo content); run it on real exhibit
+  assets once they exist. Real-device memory verification is tracked in
+  `TODOS.md`, not something this environment can perform.
 
 ## Implementation Tasks
 

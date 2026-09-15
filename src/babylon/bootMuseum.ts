@@ -38,6 +38,17 @@ export interface MuseumController {
   dispose: () => void;
 }
 
+/** Read-only test/debug hook (Playwright E2E) — never used by app code. */
+export interface MuseumDebugHandle {
+  getCameraPosition: () => { x: number; y: number; z: number };
+}
+
+declare global {
+  interface Window {
+    __museumDebug?: MuseumDebugHandle;
+  }
+}
+
 /**
  * Owns the Babylon engine/scene/camera and the RoomManager/ExhibitLoader
  * lifecycle. Framework-agnostic on purpose: React (src/App.tsx) drives it
@@ -126,6 +137,13 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
   const onResize = () => engine.resize();
   window.addEventListener("resize", onResize);
 
+  window.__museumDebug = {
+    getCameraPosition: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+  };
+
+  const WALL_HEIGHT = 3;
+  const WALL_THICKNESS = 0.3;
+
   function buildPlaceholderShell(manifest: MuseumManifest): void {
     const roomColors: Record<string, Color3> = {
       lobby: new Color3(0.22, 0.22, 0.26),
@@ -133,8 +151,18 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
       "gallery-2": new Color3(0.22, 0.19, 0.18),
     };
 
+    let overallMinX = Infinity;
+    let overallMaxX = -Infinity;
+    let overallMinZ = Infinity;
+    let overallMaxZ = -Infinity;
+
     for (const [roomId, room] of Object.entries(manifest.rooms)) {
       const { minX, maxX, minZ, maxZ } = room.boundary;
+      overallMinX = Math.min(overallMinX, minX);
+      overallMaxX = Math.max(overallMaxX, maxX);
+      overallMinZ = Math.min(overallMinZ, minZ);
+      overallMaxZ = Math.max(overallMaxZ, maxZ);
+
       const floor = MeshBuilder.CreateGround(
         `floor:${roomId}`,
         { width: maxX - minX, height: maxZ - minZ },
@@ -145,6 +173,30 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
       const mat = new StandardMaterial(`floor-mat:${roomId}`, scene);
       mat.diffuseColor = roomColors[roomId] ?? new Color3(0.2, 0.2, 0.2);
       floor.material = mat;
+    }
+
+    // Outer perimeter wall around the whole building's bounding box — not
+    // real per-room walls (no hand-authored shell asset exists yet, see the
+    // module comment), just enough to stop a visitor walking off the edge
+    // of the world at the building's boundary. Room-to-room walls/doorways
+    // are still open, matching the "no walls between rooms" placeholder.
+    const wallMat = new StandardMaterial("wall-mat", scene);
+    wallMat.diffuseColor = new Color3(0.08, 0.08, 0.09);
+    const perimeterWalls: Array<{ name: string; width: number; depth: number; x: number; z: number }> = [
+      { name: "north", width: overallMaxX - overallMinX + WALL_THICKNESS * 2, depth: WALL_THICKNESS, x: (overallMinX + overallMaxX) / 2, z: overallMaxZ },
+      { name: "south", width: overallMaxX - overallMinX + WALL_THICKNESS * 2, depth: WALL_THICKNESS, x: (overallMinX + overallMaxX) / 2, z: overallMinZ },
+      { name: "east", width: WALL_THICKNESS, depth: overallMaxZ - overallMinZ, x: overallMaxX, z: (overallMinZ + overallMaxZ) / 2 },
+      { name: "west", width: WALL_THICKNESS, depth: overallMaxZ - overallMinZ, x: overallMinX, z: (overallMinZ + overallMaxZ) / 2 },
+    ];
+    for (const wall of perimeterWalls) {
+      const box = MeshBuilder.CreateBox(
+        `wall:${wall.name}`,
+        { width: wall.width, height: WALL_HEIGHT, depth: wall.depth },
+        scene,
+      );
+      box.position.set(wall.x, WALL_HEIGHT / 2, wall.z);
+      box.checkCollisions = true;
+      box.material = wallMat;
     }
   }
 
@@ -196,6 +248,7 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
       disposed = true;
       document.removeEventListener("pointerlockchange", onPointerLockChange);
       window.removeEventListener("resize", onResize);
+      delete window.__museumDebug;
       engine.stopRenderLoop();
       scene.dispose();
       engine.dispose();
