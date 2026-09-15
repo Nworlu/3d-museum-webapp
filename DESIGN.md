@@ -50,6 +50,10 @@ In scope:
   (`/content/<roomId>.json`) from the same static host as the app —
   swappable for a real CMS later (fetch URL + mapping change only), without
   touching the renderer.
+- A `museum-manifest.json` defining room topology: every room id, its
+  adjacency list, its boundary volume in world space, and the entry room —
+  fetched once at boot so RoomManager has a single source of truth for
+  "what room am I in" and "what's adjacent."
 - Progressive loading: load the room the visitor is in + adjacent rooms;
   dispose far rooms.
 - Desktop first-person walk controls (WASD + mouse look / touch joystick).
@@ -67,13 +71,13 @@ Explicitly NOT in scope for v1 (flag, don't silently drop):
 ## Architecture
 
 ```
-                        ┌─────────────────────────┐
-                        │  Static JSON files (v1)  │
-                        │  /content/<roomId>.json  │
-                        │  (v2: swap for real CMS) │
-                        └────────────┬─────────────┘
-                                     │ fetch('/content/<roomId>.json')
-                                     ▼
+                        ┌─────────────────────────┐    ┌──────────────────────────┐
+                        │  Static JSON files (v1)  │    │  museum-manifest.json     │
+                        │  /content/<roomId>.json  │    │  room ids, adjacency,     │
+                        │  (v2: swap for real CMS) │    │  boundaries, entry room   │
+                        └────────────┬─────────────┘    └─────────────┬────────────┘
+                                     │ fetch('/content/<roomId>.json')  │ fetched once at boot
+                                     ▼                                 ▼
 ┌────────────────────────────────────────────────────────────┐
 │                        Client (browser)                     │
 │                                                              │
@@ -101,7 +105,13 @@ Explicitly NOT in scope for v1 (flag, don't silently drop):
 ### Data flow — entering a room
 
 ```
-visitor crosses room boundary
+app boot
+        │
+        ▼
+fetch museum-manifest.json (once)  →  RoomManager loads entryRoomId + spawn point
+        │
+        ▼
+visitor crosses room boundary (boundary/adjacency read from manifest)
         │
         ▼
 RoomManager detects new roomId (trigger volume / distance check)
@@ -141,6 +151,22 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
 4. **No physics engine for v1.** Simple capsule-vs-navmesh or bounding-box
    collision (Babylon built-in `scene.collisionsEnabled`) — a full physics
    engine (Havok/Cannon) is an added dependency v1 doesn't need.
+5. **Exhibit assets are de-duplicated via a URL-keyed `AssetContainer`
+   cache.** `ExhibitLoader` keeps a `Map<url, AssetContainer>`; a repeated
+   model URL (a recurring plinth, frame, or placeholder asset reused
+   across rooms) calls `container.instantiateModelsToScene()` instead of
+   re-fetching and re-parsing the glTF from scratch. Babylon-native
+   mechanism (`AssetContainer`/`LoadAssetContainerAsync`), not a custom
+   cache — matters because it directly serves the "dynamic at scale"
+   scaling goal from Key Decision #2: without it, bandwidth/GPU cost for
+   repeated assets grows with room count instead of staying flat.
+6. **Room topology lives in one manifest file, not in the 3D asset.**
+   `museum-manifest.json` (room ids, adjacency, boundary volumes, entry
+   room) is the single source of truth RoomManager reads at boot. Rejected
+   alternative: deriving topology from named trigger-volume nodes inside
+   the building `.glb` — couples application logic to 3D-authoring-tool
+   node-naming conventions, which breaks silently if an artist renames a
+   node in Blender. An explicit JSON file is the boring, explicit choice.
 
 ## Edge cases
 
@@ -154,21 +180,94 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
 - Slow network mid-room-entry → loading placeholder per exhibit slot,
   swapped in when ready; visitor is never blocked from moving.
 - Content API returns a room with 0 exhibits → render empty room, no error.
+- `museum-manifest.json` fails to load at boot → hard error screen with
+  retry (there is no meaningful degraded state without a room graph —
+  RoomManager cannot resolve an entry room or any adjacency).
+- Visitor crosses two room boundaries before the first `loadRoom` call's
+  fetch+import finishes (normal fast movement, not just hysteresis-band
+  edge cases) → **stale-response race**: `ExhibitLoader` tracks a
+  monotonic generation counter per `loadRoom` call; when a load resolves,
+  it checks it's still the current generation before attaching meshes to
+  the scene, disposing them instead if a newer `loadRoom` has superseded
+  it. Without this, a far room's exhibits can visibly pop in/out after the
+  visitor has already left it.
 
 ## Testing strategy
 
-- Unit: RoomManager boundary/hysteresis logic, ExhibitLoader load/dispose
-  bookkeeping (mock Babylon scene).
-- Integration: schema validation test for every file under `content/`
-  against the JSON shape RoomManager/ExhibitLoader expect (catches a bad
-  hand-authored room file before it ships).
-- Manual/visual: walk the full museum in a real browser, verify no
-  frame hitch on room transitions, verify disposed rooms actually free
-  memory (heap snapshot before/after a full loop).
+**Frameworks:** Vitest (unit/integration — pairs with Vite, zero extra
+config) + Playwright (E2E — drives a real browser, needed to verify actual
+WebGL rendering and frame-timing behavior a unit test can't see).
+
+### Coverage diagram
+
+```
+CODE PATHS                                              USER FLOWS
+[+] boot / manifest                                     [+] First visit
+  ├── [GAP] fetch museum-manifest.json success            ├── [GAP][→E2E] Boot → spawn in entry room, exhibits render
+  │         → RoomManager init (entry room, spawn pt)     └── [GAP]        Manifest fetch fails → error screen + retry
+  └── [GAP] fetch museum-manifest.json fails
+            → hard error screen + retry               [+] Walking between rooms
+                                                          ├── [GAP][→E2E] Adjacent room preloads on boundary cross
+[+] RoomManager                                          ├── [GAP]        Doorway straddle → no load/unload thrash
+  ├── [GAP] boundary/hysteresis: normal cross              │              (hysteresis band)
+  ├── [GAP] boundary/hysteresis: straddle (no thrash)     └── [GAP]        Fast walk across 2+ boundaries →
+  └── [GAP] per-frame distance fallback (fast movement)                   stale loadRoom discarded, no pop-in/out
+
+[+] ExhibitLoader.loadRoom(roomId)                       [+] Inspecting an exhibit
+  ├── [GAP] fetch content JSON success → import each       ├── [GAP][→E2E] Click exhibit → camera dolly + panel opens
+  ├── [GAP] exhibit model 404/bad glTF                     └── [GAP]        Close panel → camera returns, walk resumes
+  │         → placeholder mesh + marker, room still loads
+  ├── [GAP] room JSON has 0 exhibits → empty room, no error [+] Network conditions
+  ├── [GAP] generation guard: stale result discarded +      ├── [GAP]        Slow network → per-exhibit loading
+  │         disposed when a newer loadRoom supersedes it    │              placeholder, movement never blocked
+  └── [GAP] ExhibitLoader.unloadRoom → meshes/textures       └── [GAP]        Manifest or content 404 → visible,
+            disposed, memory actually freed                                recoverable error, not silent
+
+[+] Controls / collision                                 [+] Mobile parity
+  ├── [GAP] WASD + mouse-look (desktop)                    └── [GAP][→E2E] Touch joystick reaches same rooms/exhibits
+  ├── [GAP] touch joystick (mobile)                                       as desktop controls
+  └── [GAP] bounding-box collision vs building shell
+            (can't walk through walls)
+
+COVERAGE: 0/19 paths tested (0% — pre-implementation)  |  Code paths: 0/13  |  User flows: 0/9 (+ 4 E2E-worthy)
+QUALITY: none yet  |  GAPS: 19 (4 marked [→E2E])
+```
+
+Legend: ★★★ behavior + edge + error | ★★ happy path | ★ smoke check | [→E2E] = needs Playwright, not just a unit test.
+
+### Test plan (fills every GAP above before implementation is considered done)
+
+- **Unit (Vitest):**
+  - RoomManager: boundary/hysteresis transitions (cross, straddle, fast
+    multi-boundary skip), manifest parsing (valid + malformed manifest).
+  - ExhibitLoader: generation-guard correctness (a resolved-but-stale
+    `loadRoom` call must dispose its meshes and never attach them);
+    `unloadRoom` bookkeeping (mock Babylon `Scene`/`Mesh`, assert
+    `.dispose()` called); exhibit-fetch-404 → placeholder path; 0-exhibit
+    room → no error.
+- **Integration (Vitest):** schema validation for every file under
+  `content/` and for `museum-manifest.json` itself, against the shape
+  RoomManager/ExhibitLoader expect — catches a bad hand-authored file
+  before it ships.
+- **E2E (Playwright), the 4 flows marked `[→E2E]` above:** boot-to-render,
+  room-transition-preloads-adjacent, click-to-inspect open/close,
+  touch-control parity with desktop. These are the flows where mocking
+  Babylon would hide the actual failure (real glTF import, real frame
+  timing, real WebGL context) — unit tests alone would give false
+  confidence here.
+- **Manual/visual (supplements, not a substitute for the above):** walk
+  the full museum, verify no frame hitch on room transitions, verify
+  disposed rooms actually free memory (heap snapshot before/after a full
+  loop).
+
+No regression tests apply — this is a greenfield plan with no prior
+shipped behavior.
 
 ## Tech stack
 
 - Babylon.js 8.x (ESM), TypeScript, Vite for dev/build.
+- Vitest for unit/integration tests, Playwright for E2E (see Testing
+  strategy).
 - Content: a `content/` directory of static JSON files (one per room),
   served as-is by Vite/static hosting at `/content/<roomId>.json` — this
   IS the CMS interface, not a mock of one. No custom server code.
