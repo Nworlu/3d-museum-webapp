@@ -34,6 +34,17 @@ Confirmed via Babylon.js docs, forum, and Babylon 8.0 release notes:
   [Data-driven asset loading with Babylon.js](https://lawrencewhiteside.com/courses/babylon-js-ecs/dynamically-loading-game-assets-with-babylonjs-assetmanager/)
 - **WebXR** (VR walkthrough) is supported out of the box, including newer
   depth-sensing features in 8.0 — optional stretch goal, not required for v1.
+- **Mobile GPU/texture-memory (outside-voice finding, researched
+  2026-09-15):** the desktop research above doesn't cover mobile, which
+  typically hits texture-memory limits before main-thread hitching becomes
+  the issue. Mitigation: author exhibit textures as KTX2/Basis Universal
+  (`KHR_texture_basisu`), which Babylon.js loads natively and which cuts
+  GPU memory footprint vs. PNG/JPG significantly. Caveat: KTX2 transcoding
+  itself can OOM on older/low-end phones, so smaller compressed bytes
+  don't guarantee lower peak memory — this needs verification on real
+  target devices, not just assumed from the format choice.
+  [Babylon.js KTX2 docs](https://doc.babylonjs.com/features/featuresDeepDive/materials/using/ktx2Compression),
+  [Khronos KTX 2.0 overview](https://www.khronos.org/news/press/khronos-ktx-2-0-textures-enable-compact-visually-rich-gltf-3d-assets)
 
 **Conclusion: feasible with well-trodden, documented Babylon.js patterns.**
 No custom engine work is required. The interesting engineering is in the
@@ -47,9 +58,11 @@ In scope:
 - Exhibits (per room) defined entirely by data: model/image URL, transform,
   title, wall/plinth placement, description.
 - A JSON schema for exhibit data, served as static files
-  (`/content/<roomId>.json`) from the same static host as the app —
+  (`/content/<roomId>.json`, content-hash-versioned e.g.
+  `/content/gallery-1.a1b2c3.json`) from the same static host as the app —
   swappable for a real CMS later (fetch URL + mapping change only), without
-  touching the renderer.
+  touching the renderer. Versioning ensures a curator's content update
+  actually reaches visitors past CDN/browser caching — see Key Decision #7.
 - A `museum-manifest.json` defining room topology: every room id, its
   adjacency list, its boundary volume in world space, and the entry room —
   fetched once at boot so RoomManager has a single source of truth for
@@ -167,6 +180,16 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
    the building `.glb` — couples application logic to 3D-authoring-tool
    node-naming conventions, which breaks silently if an artist renames a
    node in Blender. An explicit JSON file is the boring, explicit choice.
+7. **Content URLs are content-hash-versioned, not just static paths**
+   (outside-voice finding). `museum-manifest.json` (fetched with a
+   short/no-cache header so it's always fresh) carries each room's
+   current content URL, e.g. `/content/gallery-1.a1b2c3.json`; publishing
+   an update changes the hash, so the CDN's cached copy of the *old* URL
+   is simply irrelevant — visitors get fresh content on their next
+   manifest fetch. Without this, the plan's core pitch ("publish without
+   shipping new client code") could silently fail to reach visitors
+   behind normal static-hosting/CDN caching. Standard static-site
+   cache-busting pattern. [Layer 1]
 
 ## Edge cases
 
@@ -191,6 +214,13 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
   the scene, disposing them instead if a newer `loadRoom` has superseded
   it. Without this, a far room's exhibits can visibly pop in/out after the
   visitor has already left it.
+- Click-to-inspect dollies the camera toward an exhibit near a room
+  boundary while RoomManager's per-frame check keys off camera position →
+  **inspect-mode race** (outside-voice finding): RoomManager tracks an
+  `inspecting` flag (set when InspectPanel opens, cleared on close) and
+  skips boundary/dispose evaluation while true — the visitor's true
+  position hasn't changed, only the camera's framing has, so the exhibit
+  being inspected can't be disposed out from under the open panel.
 
 ## Testing strategy
 
@@ -245,6 +275,13 @@ Legend: ★★★ behavior + edge + error | ★★ happy path | ★ smoke check 
     `unloadRoom` bookkeeping (mock Babylon `Scene`/`Mesh`, assert
     `.dispose()` called); exhibit-fetch-404 → placeholder path; 0-exhibit
     room → no error.
+- **Build-time sanity check (outside-voice finding):** boundary volumes in
+  `museum-manifest.json` are hand-authored separately from the building
+  `.glb` they must spatially match, and nothing catches drift when the
+  shell changes but the manifest doesn't. A script (run in CI and locally)
+  loads both together and flags boundaries that fall outside the shell's
+  overall bounding volume, or rooms with no matching geometry nearby —
+  cheap sanity net, not full geometric validation.
 - **Integration (Vitest):** schema validation for every file under
   `content/` and for `museum-manifest.json` itself, against the shape
   RoomManager/ExhibitLoader expect — catches a bad hand-authored file
@@ -255,6 +292,14 @@ Legend: ★★★ behavior + edge + error | ★★ happy path | ★ smoke check 
   Babylon would hide the actual failure (real glTF import, real frame
   timing, real WebGL context) — unit tests alone would give false
   confidence here.
+- **Perf regression (Playwright, outside-voice finding):** the feasibility
+  research names main-thread hitching during asset load as a real risk
+  with documented mitigations (background loading, `freezeActiveMeshes`,
+  progressive load) — that risk needs an automated check, not just a
+  manual eyeball. A room-transition test asserts worst-frame-time during
+  `ExhibitLoader.loadRoom` stays under a budget (e.g. captured via
+  `requestAnimationFrame` deltas), turning "verify no frame hitch" into
+  something CI catches on regression instead of a human noticing it later.
 - **Manual/visual (supplements, not a substitute for the above):** walk
   the full museum, verify no frame hitch on room transitions, verify
   disposed rooms actually free memory (heap snapshot before/after a full
@@ -271,3 +316,7 @@ shipped behavior.
 - Content: a `content/` directory of static JSON files (one per room),
   served as-is by Vite/static hosting at `/content/<roomId>.json` — this
   IS the CMS interface, not a mock of one. No custom server code.
+- Exhibit textures authored/exported as KTX2 (Basis Universal) for GPU
+  memory budget on mobile — verify peak transcode memory on real
+  low-end-target devices before locking this in as the only path (see
+  Feasibility research).
