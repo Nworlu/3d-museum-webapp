@@ -408,53 +408,67 @@ failure and its current coverage:
 Synthesized from this review's findings. Each task derives from a specific
 finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~1-2 days / CC: ~2-3h)** — RoomManager — Load
+- [x] **T1 (P1, human: ~1-2 days / CC: ~2-3h)** — RoomManager — Load
   `museum-manifest.json` at boot; resolve entry room, spawn point, per-room
   adjacency and boundary volumes
   - Surfaced by: Architecture review — Issue 1A (no room topology data source)
   - Files: `content/museum-manifest.json`, `src/room/RoomManager.ts`
   - Verify: unit tests for manifest parsing (valid + malformed), boot flow spawns in `entryRoomId`
-- [ ] **T2 (P1, human: ~1-2h / CC: ~15min)** — ExhibitLoader — Add
+- [x] **T2 (P1, human: ~1-2h / CC: ~15min)** — ExhibitLoader — Add
   monotonic generation counter; discard/dispose stale `loadRoom` results
   - Surfaced by: Code Quality review — Issue 2A (async load race)
   - Files: `src/loader/ExhibitLoader.ts`
   - Verify: unit test simulating overlapping `loadRoom` calls, assert stale meshes never attach and get disposed
-- [ ] **T3 (P2, human: ~2-3h / CC: ~15min)** — ExhibitLoader — URL-keyed
+- [x] **T3 (P2, human: ~2-3h / CC: ~15min)** — ExhibitLoader — URL-keyed
   `AssetContainer` cache for repeated exhibit models
   - Surfaced by: Performance review — Issue 3A (no asset de-dup)
   - Files: `src/loader/ExhibitLoader.ts`
   - Verify: unit test — importing the same URL twice hits the cache, not a second fetch
-- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — Build pipeline — Content-hash-
+- [x] **T4 (P1, human: ~2h / CC: ~15min)** — Build pipeline — Content-hash-
   version room content URLs; wire hash into `museum-manifest.json`
   - Surfaced by: Outside voice — point 5 (CMS-swap claim unverified against CDN caching)
   - Files: `content/museum-manifest.json`, build script
   - Verify: manual — publish a content change, confirm the URL (and thus the fetched content) changes
-- [ ] **T5 (P2, human: ~2-3h / CC: ~20min)** — Build script — Sanity-check
+  - Done: `scripts/version-content.mjs`, wired into predev/prebuild/pretest.
+- [~] **T5 (P2, human: ~2-3h / CC: ~20min)** — Build script — Sanity-check
   `museum-manifest.json` boundaries against building `.glb` bounding volume
   - Surfaced by: Outside voice — point 4 (manifest/glb drift)
   - Files: `scripts/validate-manifest.ts`
   - Verify: script fails on a deliberately mismatched fixture, passes on the real manifest
-- [ ] **T6 (P1, human: ~1h / CC: ~10min)** — RoomManager + InspectPanel —
+  - Partial: the manifest self-consistency half (adjacency symmetry,
+    boundary overlap/well-formedness, contentUrl resolves) shipped as
+    Vitest integration tests (`test/integration/content-schema.test.ts`).
+    The `.glb`-comparison half is still blocked — no hand-authored
+    building shell asset exists yet (see Tech stack / Scope).
+- [x] **T6 (P1, human: ~1h / CC: ~10min)** — RoomManager + InspectPanel —
   Add `inspecting` flag; skip boundary/dispose evaluation while inspecting
   - Surfaced by: Outside voice — point 9 (inspect-mode dispose race)
   - Files: `src/room/RoomManager.ts`, `src/ui/InspectPanel.ts`
   - Verify: unit test — room transition does not fire while `inspecting` is true
-- [ ] **T7 (P2, human: ~3-4h / CC: ~20min)** — Playwright — Frame-timing
+- [x] **T7 (P2, human: ~3-4h / CC: ~20min)** — Playwright — Frame-timing
   regression test during room-transition load
   - Surfaced by: Outside voice — point 7 (no automated perf check for the plan's named main-thread-hitch risk)
   - Files: `test/e2e/perf.spec.ts`
   - Verify: test fails if worst-frame-time during load exceeds budget (tune threshold against a real run first)
-- [ ] **T8 (P2, human: ~2h / CC: ~15min)** — Playwright — Collision E2E:
+- [x] **T8 (P2, human: ~2h / CC: ~15min)** — Playwright — Collision E2E:
   fast movement toward a wall must not tunnel through it
   - Surfaced by: Failure modes review (collision codepath had no assigned test)
   - Files: `test/e2e/collision.spec.ts`
   - Verify: test fails if the visitor's position ends up outside the building bounding volume after a fast approach
-- [ ] **T9 (P2, human: ~1 day / CC: ~1h)** — Asset pipeline + manual
+  - Done: also added a perimeter wall (none existed — a real gap this
+    test surfaced, since a visitor could previously walk off the edge
+    of the world with nothing to collide with).
+- [~] **T9 (P2, human: ~1 day / CC: ~1h)** — Asset pipeline + manual
   device lab — Export exhibit textures as KTX2/Basis; verify peak
   transcode memory on real low-end target devices
   - Surfaced by: Outside voice — point 8 (mobile feasibility research gap), researched during this review
   - Files: texture export pipeline, `DESIGN.md` Feasibility research
   - Verify: manual device testing (no CI equivalent for GPU memory limits); document the result back into this doc
+  - Partial: `npm run optimize-model` verified end-to-end (120.48 KB →
+    46.18 KB, valid `KHR_texture_basisu` output). Not run against real
+    exhibit assets (current content is public placeholder models this
+    project doesn't own). Real-device memory verification tracked in
+    `TODOS.md` — no physical device available in this environment.
 
 _No new tasks from Architecture review beyond T1 (all other architecture points confirmed sound as designed)._
 
