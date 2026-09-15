@@ -46,8 +46,10 @@ In scope:
   `.glb`.
 - Exhibits (per room) defined entirely by data: model/image URL, transform,
   title, wall/plinth placement, description.
-- A JSON schema + local content API (`GET /api/museum/:roomId`) standing in
-  for a future CMS — swappable later without touching the renderer.
+- A JSON schema for exhibit data, served as static files
+  (`/content/<roomId>.json`) from the same static host as the app —
+  swappable for a real CMS later (fetch URL + mapping change only), without
+  touching the renderer.
 - Progressive loading: load the room the visitor is in + adjacent rooms;
   dispose far rooms.
 - Desktop first-person walk controls (WASD + mouse look / touch joystick).
@@ -66,10 +68,11 @@ Explicitly NOT in scope for v1 (flag, don't silently drop):
 
 ```
                         ┌─────────────────────────┐
-                        │   Content source (v1:    │
-                        │   local JSON; v2: CMS)    │
+                        │  Static JSON files (v1)  │
+                        │  /content/<roomId>.json  │
+                        │  (v2: swap for real CMS) │
                         └────────────┬─────────────┘
-                                     │ GET /api/museum/:roomId
+                                     │ fetch('/content/<roomId>.json')
                                      ▼
 ┌────────────────────────────────────────────────────────────┐
 │                        Client (browser)                     │
@@ -105,7 +108,7 @@ RoomManager detects new roomId (trigger volume / distance check)
         │
         ▼
 ExhibitLoader.loadRoom(roomId)
-        │  fetch /api/museum/:roomId  (exhibit list: model URL, transform, text)
+        │  fetch /content/<roomId>.json  (exhibit list: model URL, transform, text)
         ▼
 for each exhibit → ImportMeshAsync (background, progressive)
         │
@@ -118,10 +121,16 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
 
 ### Key decisions
 
-1. **Content interface is the CMS abstraction, not a CMS SDK.** v1 hits a
-   local JSON API with the exact shape a real headless CMS (Contentful/
-   Sanity/etc.) would return. Swapping backends later is a fetch-URL +
-   mapping change, not a rewrite. [Layer 1 — boring, reversible.]
+1. **Content interface is a static JSON contract, not a custom API server.**
+   v1 serves `/content/<roomId>.json` as plain static files, shaped exactly
+   like a real headless CMS (Contentful/Sanity/etc.) response. No backend
+   process to write, deploy, or maintain for v1; swapping to a live CMS
+   later is a fetch-URL + mapping change, not a rewrite. **[Scope reduction,
+   decided in eng review]:** an earlier draft of this plan had a local
+   Express/Vite-middleware API server standing in for the CMS — cut because
+   static hosting already serves JSON with zero code, and it added a service
+   with no functional benefit over a file for v1's needs. [Layer 1 — boring,
+   reversible.]
 2. **Room-based streaming, not global load.** Matches Babylon's documented
    frustum/proximity dispose pattern; keeps memory bounded regardless of
    total museum size — this is what makes it "dynamic" at scale (curators
@@ -150,8 +159,9 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
 
 - Unit: RoomManager boundary/hysteresis logic, ExhibitLoader load/dispose
   bookkeeping (mock Babylon scene).
-- Integration: content API contract test (schema validation on the JSON
-  shape RoomManager expects).
+- Integration: schema validation test for every file under `content/`
+  against the JSON shape RoomManager/ExhibitLoader expect (catches a bad
+  hand-authored room file before it ships).
 - Manual/visual: walk the full museum in a real browser, verify no
   frame hitch on room transitions, verify disposed rooms actually free
   memory (heap snapshot before/after a full loop).
@@ -159,6 +169,6 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
 ## Tech stack
 
 - Babylon.js 8.x (ESM), TypeScript, Vite for dev/build.
-- Local JSON content API: a tiny Express (or Vite dev middleware) endpoint
-  reading from a `content/` directory of JSON files — this IS the CMS
-  interface, not a mock of one.
+- Content: a `content/` directory of static JSON files (one per room),
+  served as-is by Vite/static hosting at `/content/<roomId>.json` — this
+  IS the CMS interface, not a mock of one. No custom server code.
