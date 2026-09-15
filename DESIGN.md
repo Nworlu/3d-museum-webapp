@@ -372,6 +372,12 @@ failure and its current coverage:
 ## Tech stack
 
 - Babylon.js 8.x (ESM), TypeScript, Vite for dev/build.
+- React owns the DOM UI overlay (InspectPanel, boot-error screen, future
+  HUD/menus) via a canvas ref; Babylon's engine/scene/camera and
+  RoomManager/ExhibitLoader stay framework-agnostic imperative code
+  (`src/babylon/bootMuseum.ts`), driven by React through a small
+  callback/controller interface. This keeps the split from Key Decisions
+  1-7 intact — no 3D/streaming logic depends on the UI framework choice.
 - Vitest for unit/integration tests, Playwright for E2E (see Testing
   strategy).
 - Content: a `content/` directory of static JSON files (one per room),
