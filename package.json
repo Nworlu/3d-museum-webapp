@@ -4,10 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "version-content": "node scripts/version-content.mjs",
+    "predev": "npm run version-content",
     "dev": "vite",
+    "prebuild": "npm run version-content",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "pretest": "npm run version-content",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@babylonjs/core": "^8.0.0",

@@ -5,17 +5,17 @@
     "lobby": {
       "boundary": { "minX": -6, "maxX": 6, "minZ": -10, "maxZ": 0 },
       "adjacent": ["gallery-1"],
-      "contentUrl": "/content/lobby.v1.json"
+      "contentFile": "lobby.json"
     },
     "gallery-1": {
       "boundary": { "minX": -6, "maxX": 6, "minZ": 0, "maxZ": 10 },
       "adjacent": ["lobby", "gallery-2"],
-      "contentUrl": "/content/gallery-1.v1.json"
+      "contentFile": "gallery-1.json"
     },
     "gallery-2": {
       "boundary": { "minX": -6, "maxX": 6, "minZ": 10, "maxZ": 20 },
       "adjacent": ["gallery-1"],
-      "contentUrl": "/content/gallery-2.v1.json"
+      "contentFile": "gallery-2.json"
     }
   }
 }
