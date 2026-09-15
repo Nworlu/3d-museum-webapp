@@ -73,13 +73,28 @@ In scope:
 - Basic click-to-inspect exhibit (camera dolly + info panel).
 
 Explicitly NOT in scope for v1 (flag, don't silently drop):
-- WebXR/VR mode (documented as feasible; deferred — separate feature).
-- Multi-user/shared presence.
-- Real CMS integration (headless CMS swap-in) — v1 ships a local JSON API
-  behind the same interface so the swap is a config change, not a rewrite.
-- Procedurally generated room layouts (v1 rooms are hand-authored).
-- Build/publish pipeline for distributing the app as a packaged artifact
-  (v1 targets a normal web deploy, not a downloadable binary).
+- WebXR/VR mode — documented as feasible (Babylon.js 8.0 WebXR support),
+  deferred as a separate feature since v1's walk-controls scope is desktop
+  + touch only.
+- Multi-user/shared presence — no requirement for it in the problem
+  statement; adding it would mean a whole new networking/state-sync
+  architecture this plan doesn't need to solve.
+- Real CMS integration (headless CMS swap-in) — v1 ships content-hash-
+  versioned static JSON files behind the same interface a real CMS would
+  serve, so the swap is a config/fetch-URL change later, not a rewrite now.
+- Procedurally generated room layouts — v1 rooms are hand-authored; no
+  generation algorithm to design or validate yet.
+- Build/publish pipeline for distributing the app as a packaged artifact —
+  v1 targets a normal web deploy (static hosting), not a downloadable
+  binary, so no CI/CD artifact pipeline is needed.
+- Exhibit transform-sanity checker (validating authored placements against
+  room boundaries before publish) — deferred to `TODOS.md`; real scope on
+  top of an already-scoped v1, buildable later on data v1 already produces.
+
+## What already exists
+
+None — this is a greenfield project (new repo, no prior code). Nothing to
+reuse or check for accidental duplication against.
 
 ## Architecture
 
@@ -286,12 +301,16 @@ Legend: ★★★ behavior + edge + error | ★★ happy path | ★ smoke check 
   `content/` and for `museum-manifest.json` itself, against the shape
   RoomManager/ExhibitLoader expect — catches a bad hand-authored file
   before it ships.
-- **E2E (Playwright), the 4 flows marked `[→E2E]` above:** boot-to-render,
+- **E2E (Playwright), the 4 flows marked `[→E2E]` above, plus one closed
+  during Failure Modes review below:** boot-to-render,
   room-transition-preloads-adjacent, click-to-inspect open/close,
-  touch-control parity with desktop. These are the flows where mocking
-  Babylon would hide the actual failure (real glTF import, real frame
-  timing, real WebGL context) — unit tests alone would give false
-  confidence here.
+  touch-control parity with desktop, and **collision-vs-wall** (fast
+  movement toward a wall must stop at the boundary, not tunnel through
+  it — a known failure mode of naive bounding-box collision at high
+  velocity/low frame rate). These are the flows where mocking Babylon
+  would hide the actual failure (real glTF import, real frame timing,
+  real WebGL context, real collision resolution) — unit tests alone would
+  give false confidence here.
 - **Perf regression (Playwright, outside-voice finding):** the feasibility
   research names main-thread hitching during asset load as a real risk
   with documented mitigations (background loading, `freezeActiveMeshes`,
@@ -308,6 +327,48 @@ Legend: ★★★ behavior + edge + error | ★★ happy path | ★ smoke check 
 No regression tests apply — this is a greenfield plan with no prior
 shipped behavior.
 
+## Failure modes
+
+For each codepath from the coverage diagram, one realistic production
+failure and its current coverage:
+
+| Codepath | Realistic failure | Test? | Error handling? | User sees |
+|---|---|---|---|---|
+| Manifest fetch | Network drop at boot | Yes (unit) | Yes (edge case) | Clear error + retry |
+| Content fetch (per room) | 404 / bad JSON | Yes (integration) | Yes (edge case) | Clear placeholder marker |
+| ExhibitLoader race | Overlapping loads from fast movement | Yes (unit, generation guard) | Yes | Silent (by design — the fix *is* silence, correctly) |
+| Inspect-mode dispose race | Exhibit disposed mid-inspection | Yes (unit, inspecting flag) | Yes | N/A — prevented, not surfaced |
+| Manifest/glb drift | Boundary edited without matching shell edit | Yes (build-time sanity check) | Yes (build fails) | Developer sees it at build time, not a visitor |
+| Content caching | Stale cached content after publish | Yes (via versioned URLs, verify in QA) | Yes (hash-versioning) | Visitor gets fresh content on next manifest fetch |
+| Collision | Fast movement tunnels through a wall | Yes (E2E, added above) | Babylon `collisionsEnabled` (needs velocity clamping if E2E finds tunneling) | Visible immediately (not silent) — no critical-gap flag, but the E2E test above is the actual verification, not an assumption |
+| Frame hitch during load | Main-thread stall on heavy room | Yes (perf regression test, added above) | Mitigations already in Key Decisions 2-5 | Visible stutter if mitigations fail — now caught by CI |
+| Mobile texture memory | KTX2 transcode OOM on low-end device | No automated test yet (needs real-device lab, not CI) | Partial — format choice, not runtime fallback | Tab crash/reload if it happens — **flagged below, not a silent-and-untested critical gap because it's visible, but has no runtime fallback** |
+
+**One item worth calling out, not a blocking critical gap (it's visible, not silent):** mobile texture-memory OOM has no runtime fallback (e.g., falling back to lower-resolution textures if transcode fails) — only the format choice (KTX2) as mitigation. Real-device verification (already scoped above) will show whether a fallback is actually needed; premature to design one before that data exists.
+
+## Worktree parallelization strategy
+
+**Dependency table:**
+
+| Step | Modules touched | Depends on |
+|------|-----------------|------------|
+| Manifest + content schema, build-time sanity check | `content/`, `scripts/` (validation) | — |
+| RoomManager + ExhibitLoader (streaming, generation guard, asset cache) | `src/room/`, `src/loader/` | Manifest/content schema shape |
+| Controls + collision (WASD/touch, bounding-box vs shell) | `src/controls/` | — |
+| InspectPanel UI + inspect-mode flag | `src/ui/`, hooks into `src/room/` | RoomManager's `inspecting` flag contract |
+| Test harness (Vitest + Playwright setup, perf regression test) | `test/` | RoomManager/ExhibitLoader/Controls exist to test against |
+
+**Parallel lanes:**
+- Lane A: Manifest + content schema + build-time sanity check (independent, no other module dependency)
+- Lane B: RoomManager + ExhibitLoader (sequential internally — same module, tight coupling) → depends on Lane A's schema shape being settled first
+- Lane C: Controls + collision (independent of A/B — different module, only shares the Scene)
+- Lane D: InspectPanel UI (depends on Lane B for the `inspecting` flag contract, otherwise independent)
+- Lane E: Test harness setup (depends on B, C, D existing to have something to test)
+
+**Execution order:** Launch A + C in parallel first (no shared modules, no dependency). Once A lands, launch B. Once B lands, launch D. E waits on B, C, D.
+
+**Conflict flags:** none — A, B, C, D each own distinct module directories (`content/`+`scripts/`, `src/room/`+`src/loader/`, `src/controls/`, `src/ui/`); no two lanes write the same directory.
+
 ## Tech stack
 
 - Babylon.js 8.x (ESM), TypeScript, Vite for dev/build.
@@ -320,3 +381,58 @@ shipped behavior.
   memory budget on mobile — verify peak transcode memory on real
   low-end-target devices before locking this in as the only path (see
   Feasibility research).
+
+## Implementation Tasks
+
+Synthesized from this review's findings. Each task derives from a specific
+finding above. Run with Claude Code or Codex; checkbox as you ship.
+
+- [ ] **T1 (P1, human: ~1-2 days / CC: ~2-3h)** — RoomManager — Load
+  `museum-manifest.json` at boot; resolve entry room, spawn point, per-room
+  adjacency and boundary volumes
+  - Surfaced by: Architecture review — Issue 1A (no room topology data source)
+  - Files: `content/museum-manifest.json`, `src/room/RoomManager.ts`
+  - Verify: unit tests for manifest parsing (valid + malformed), boot flow spawns in `entryRoomId`
+- [ ] **T2 (P1, human: ~1-2h / CC: ~15min)** — ExhibitLoader — Add
+  monotonic generation counter; discard/dispose stale `loadRoom` results
+  - Surfaced by: Code Quality review — Issue 2A (async load race)
+  - Files: `src/loader/ExhibitLoader.ts`
+  - Verify: unit test simulating overlapping `loadRoom` calls, assert stale meshes never attach and get disposed
+- [ ] **T3 (P2, human: ~2-3h / CC: ~15min)** — ExhibitLoader — URL-keyed
+  `AssetContainer` cache for repeated exhibit models
+  - Surfaced by: Performance review — Issue 3A (no asset de-dup)
+  - Files: `src/loader/ExhibitLoader.ts`
+  - Verify: unit test — importing the same URL twice hits the cache, not a second fetch
+- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — Build pipeline — Content-hash-
+  version room content URLs; wire hash into `museum-manifest.json`
+  - Surfaced by: Outside voice — point 5 (CMS-swap claim unverified against CDN caching)
+  - Files: `content/museum-manifest.json`, build script
+  - Verify: manual — publish a content change, confirm the URL (and thus the fetched content) changes
+- [ ] **T5 (P2, human: ~2-3h / CC: ~20min)** — Build script — Sanity-check
+  `museum-manifest.json` boundaries against building `.glb` bounding volume
+  - Surfaced by: Outside voice — point 4 (manifest/glb drift)
+  - Files: `scripts/validate-manifest.ts`
+  - Verify: script fails on a deliberately mismatched fixture, passes on the real manifest
+- [ ] **T6 (P1, human: ~1h / CC: ~10min)** — RoomManager + InspectPanel —
+  Add `inspecting` flag; skip boundary/dispose evaluation while inspecting
+  - Surfaced by: Outside voice — point 9 (inspect-mode dispose race)
+  - Files: `src/room/RoomManager.ts`, `src/ui/InspectPanel.ts`
+  - Verify: unit test — room transition does not fire while `inspecting` is true
+- [ ] **T7 (P2, human: ~3-4h / CC: ~20min)** — Playwright — Frame-timing
+  regression test during room-transition load
+  - Surfaced by: Outside voice — point 7 (no automated perf check for the plan's named main-thread-hitch risk)
+  - Files: `test/e2e/perf.spec.ts`
+  - Verify: test fails if worst-frame-time during load exceeds budget (tune threshold against a real run first)
+- [ ] **T8 (P2, human: ~2h / CC: ~15min)** — Playwright — Collision E2E:
+  fast movement toward a wall must not tunnel through it
+  - Surfaced by: Failure modes review (collision codepath had no assigned test)
+  - Files: `test/e2e/collision.spec.ts`
+  - Verify: test fails if the visitor's position ends up outside the building bounding volume after a fast approach
+- [ ] **T9 (P2, human: ~1 day / CC: ~1h)** — Asset pipeline + manual
+  device lab — Export exhibit textures as KTX2/Basis; verify peak
+  transcode memory on real low-end target devices
+  - Surfaced by: Outside voice — point 8 (mobile feasibility research gap), researched during this review
+  - Files: texture export pipeline, `DESIGN.md` Feasibility research
+  - Verify: manual device testing (no CI equivalent for GPU memory limits); document the result back into this doc
+
+_No new tasks from Architecture review beyond T1 (all other architecture points confirmed sound as designed)._
