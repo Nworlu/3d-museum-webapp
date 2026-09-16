@@ -8,17 +8,38 @@ import { createRoot } from "react-dom/client";
 // app-wide fixed dark theme in index.html (a real bug this fixed — a static
 // top-level import pulls in a module's side effects, CSS included, whether
 // or not that branch ever renders).
-const AdminPage = lazy(() => import("./admin/AdminPage").then((m) => ({ default: m.AdminPage })));
+const AdminPage = lazy(() =>
+  import("./admin/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
 const App = lazy(() => import("./App").then((m) => ({ default: m.App })));
-const LandingPage = lazy(() => import("./landing/LandingPage").then((m) => ({ default: m.LandingPage })));
+const LandingPage = lazy(() =>
+  import("./landing/LandingPage").then((m) => ({ default: m.LandingPage })),
+);
 
-const path = window.location.pathname;
-const Page = path === "/admin" ? AdminPage : path === "/museum" ? App : LandingPage;
+// const path = window.location.pathname;
+// const Page = path === "/admin" ? AdminPage : path === "/museum" ? App : LandingPage;
+import { createBrowserRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <LandingPage />,
+  },
+  {
+    path: "admin",
+    element: <AdminPage />,
+  },
+  {
+    path: "/museum",
+    element: <App />,
+  },
+]);
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Suspense fallback={null}>
-      <Page />
+      {/* <Page /> */}
+      <RouterProvider router={router} />
     </Suspense>
   </StrictMode>,
 );
