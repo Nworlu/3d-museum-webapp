@@ -57,11 +57,12 @@ export function AdminPage() {
   return (
     <div style={pageStyles.page}>
       <header style={pageStyles.header}>
+        <div style={pageStyles.eyebrow}>Backstage</div>
         <h1 style={pageStyles.h1}>Museum Admin</h1>
         <p style={pageStyles.sub}>Add or remove exhibits. Changes take effect on the next page load of the museum.</p>
       </header>
 
-      {loadError && <p style={{ color: "#ff8a80" }}>{loadError}</p>}
+      {loadError && <p style={pageStyles.loadError}>{loadError}</p>}
 
       {rooms ? (
         <div style={pageStyles.columns}>
@@ -73,9 +74,7 @@ export function AdminPage() {
                 <ul style={pageStyles.exhibitList}>
                   {room.exhibits.map((exhibit) => (
                     <li key={exhibit.id} style={pageStyles.exhibitRow}>
-                      {exhibit.imageUrl && (
-                        <img src={exhibit.imageUrl} alt="" style={pageStyles.thumb} />
-                      )}
+                      {exhibit.imageUrl && <img src={exhibit.imageUrl} alt="" style={pageStyles.thumb} />}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={pageStyles.exhibitTitle}>{exhibit.title}</div>
                         <div style={pageStyles.exhibitDesc}>{exhibit.description}</div>
@@ -84,6 +83,8 @@ export function AdminPage() {
                         style={pageStyles.deleteBtn}
                         onClick={() => handleDelete(room.roomId, exhibit.id)}
                         aria-label={`Remove ${exhibit.title}`}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--oxblood)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--stone-line)")}
                       >
                         Remove
                       </button>
@@ -105,7 +106,7 @@ export function AdminPage() {
           />
         </div>
       ) : (
-        !loadError && <p style={{ color: "#888" }}>Loading rooms…</p>
+        !loadError && <p style={pageStyles.loading}>Loading rooms…</p>
       )}
     </div>
   );
@@ -125,7 +126,11 @@ function LoginForm({ onLogin }: { onLogin: (header: string) => void }) {
       await getRooms(header);
       onLogin(header);
     } catch (err) {
-      setError(err instanceof AdminApiError && err.status === 401 ? "Wrong password." : "Could not reach the admin server. Is it running (npm run server)?");
+      setError(
+        err instanceof AdminApiError && err.status === 401
+          ? "Wrong password."
+          : "Could not reach the admin server. Is it running (npm run server)?",
+      );
     } finally {
       setChecking(false);
     }
@@ -134,6 +139,18 @@ function LoginForm({ onLogin }: { onLogin: (header: string) => void }) {
   return (
     <div style={loginStyles.wrap}>
       <form onSubmit={handleSubmit} style={loginStyles.form}>
+        <div style={loginStyles.mark}>
+          <svg width="28" height="28" viewBox="0 0 26 26" fill="none">
+            <path
+              d="M13 2 24 9v2H2V9L13 2Z"
+              stroke="var(--brass)"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <path d="M4 12v10M9 12v10M13 12v10M17 12v10M22 12v10" stroke="var(--brass)" strokeWidth="1.6" />
+            <path d="M2 24h22" stroke="var(--brass)" strokeWidth="1.6" />
+          </svg>
+        </div>
         <h1 style={loginStyles.h1}>Museum Admin</h1>
         <input
           type="password"
@@ -152,29 +169,108 @@ function LoginForm({ onLogin }: { onLogin: (header: string) => void }) {
   );
 }
 
+const FONT_DISPLAY = "Cambria, Georgia, 'Times New Roman', serif";
+const FONT_MONO = "'IBM Plex Mono', ui-monospace, monospace";
+
 const pageStyles = {
-  page: { minHeight: "100%", background: "#0f0f0f", color: "#eee", padding: "32px 40px", fontFamily: "system-ui, sans-serif" },
-  header: { marginBottom: 28 },
-  h1: { margin: 0, fontSize: 24 },
-  sub: { color: "#999", fontSize: 14, marginTop: 6 },
+  page: {
+    minHeight: "100%",
+    background: "var(--wall)",
+    color: "var(--ink)",
+    padding: "40px 44px 60px",
+    fontFamily: "'Work Sans', system-ui, sans-serif",
+  },
+  header: { marginBottom: 32, maxWidth: 640 },
+  eyebrow: {
+    fontFamily: FONT_MONO,
+    fontSize: 11,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase" as const,
+    color: "var(--stone)",
+    marginBottom: 10,
+  },
+  h1: { margin: 0, fontSize: 30, fontFamily: FONT_DISPLAY, fontWeight: 500 },
+  sub: { color: "var(--ink-soft)", fontSize: 14, marginTop: 10, lineHeight: 1.5 },
+  loadError: { color: "var(--oxblood)", fontSize: 14 },
+  loading: { color: "var(--stone)", fontSize: 14 },
   columns: { display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" as const },
   roomsColumn: { display: "flex", flexDirection: "column" as const, gap: 20, flex: "1 1 480px", minWidth: 320 },
-  roomCard: { background: "#1c1c1c", borderRadius: 8, padding: 20 },
-  roomTitle: { margin: "0 0 12px", fontSize: 16, textTransform: "uppercase" as const, letterSpacing: "0.05em", color: "#bbb" },
-  empty: { color: "#666", fontSize: 13, fontStyle: "italic" as const },
-  exhibitList: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" as const, gap: 10 },
-  exhibitRow: { display: "flex", alignItems: "center", gap: 12, borderTop: "1px solid #2a2a2a", paddingTop: 10 },
-  thumb: { width: 44, height: 44, objectFit: "cover" as const, borderRadius: 4, flex: "none" },
-  exhibitTitle: { fontSize: 14, fontWeight: 500 },
-  exhibitDesc: { fontSize: 12, color: "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
-  deleteBtn: { background: "none", border: "1px solid #444", color: "#ccc", borderRadius: 4, padding: "6px 10px", fontSize: 12, cursor: "pointer", flex: "none" },
+  roomCard: { background: "var(--card)", border: "1px solid var(--stone-line)", borderRadius: 4, padding: 22 },
+  roomTitle: {
+    margin: "0 0 14px",
+    fontSize: 13,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.1em",
+    color: "var(--brass-bright)",
+  },
+  empty: { color: "var(--stone)", fontSize: 13, fontStyle: "italic" as const },
+  exhibitList: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" as const, gap: 12 },
+  exhibitRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    borderTop: "1px solid var(--stone-line)",
+    paddingTop: 12,
+  },
+  thumb: { width: 46, height: 46, objectFit: "cover" as const, borderRadius: 2, flex: "none", border: "1px solid var(--stone-line)" },
+  exhibitTitle: { fontSize: 14, fontFamily: FONT_DISPLAY, fontStyle: "italic" as const, color: "var(--ink)" },
+  exhibitDesc: {
+    fontSize: 12,
+    color: "var(--stone)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    marginTop: 2,
+  },
+  deleteBtn: {
+    background: "none",
+    border: "1px solid var(--stone-line)",
+    color: "var(--ink-soft)",
+    borderRadius: 3,
+    padding: "6px 12px",
+    fontSize: 11,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    flex: "none",
+    transition: "border-color 0.15s ease",
+  },
 };
 
 const loginStyles = {
-  wrap: { minHeight: "100vh", display: "grid", placeItems: "center", background: "#0f0f0f", fontFamily: "system-ui, sans-serif" },
-  form: { display: "flex", flexDirection: "column" as const, gap: 12, width: 280 },
-  h1: { color: "#fff", fontSize: 20, margin: "0 0 8px", textAlign: "center" as const },
-  input: { background: "#1c1c1c", border: "1px solid #333", borderRadius: 4, color: "#fff", padding: "10px 12px", fontSize: 14 },
-  error: { color: "#ff8a80", fontSize: 13, margin: 0 },
-  submitBtn: { background: "#7a2e2a", color: "#f5ede3", border: "none", borderRadius: 4, padding: "10px 16px", fontSize: 14, cursor: "pointer" },
+  wrap: { minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--wall)", fontFamily: "'Work Sans', system-ui, sans-serif" },
+  form: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 14,
+    width: 300,
+    background: "var(--card)",
+    border: "1px solid var(--stone-line)",
+    borderRadius: 4,
+    padding: "32px 28px",
+  },
+  mark: { display: "flex", justifyContent: "center", marginBottom: 4 },
+  h1: { color: "var(--ink)", fontSize: 20, fontFamily: FONT_DISPLAY, fontWeight: 500, margin: "0 0 6px", textAlign: "center" as const },
+  input: {
+    background: "var(--wall-raised)",
+    border: "1px solid var(--stone-line)",
+    borderRadius: 3,
+    color: "var(--ink)",
+    padding: "11px 13px",
+    fontSize: 14,
+    fontFamily: "inherit",
+  },
+  error: { color: "var(--oxblood)", fontSize: 13, margin: 0 },
+  submitBtn: {
+    background: "var(--oxblood)",
+    color: "#f5ede3",
+    border: "none",
+    borderRadius: 3,
+    padding: "11px 16px",
+    fontSize: 14,
+    fontFamily: "inherit",
+    cursor: "pointer",
+  },
 };

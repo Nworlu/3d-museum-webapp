@@ -52,6 +52,7 @@ export function AddExhibitForm({ authHeader, rooms, onAdded }: AddExhibitFormPro
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
+      <div style={styles.eyebrow}>New acquisition</div>
       <h2 style={styles.h2}>Add an exhibit</h2>
 
       <label style={styles.label} htmlFor="exhibit-room">
@@ -150,37 +151,51 @@ export function AddExhibitForm({ authHeader, rooms, onAdded }: AddExhibitFormPro
   );
 }
 
+const FONT_DISPLAY = "Cambria, Georgia, 'Times New Roman', serif";
+const FONT_MONO = "'IBM Plex Mono', ui-monospace, monospace";
+
 const styles = {
   form: {
     display: "flex",
     flexDirection: "column" as const,
     gap: 6,
     maxWidth: 420,
-    background: "#1c1c1c",
-    padding: 24,
-    borderRadius: 8,
-  },
-  h2: { color: "#fff", fontSize: 18, margin: "0 0 12px" },
-  label: { color: "#bbb", fontSize: 13, marginTop: 10 },
-  radioLabel: { color: "#ddd", fontSize: 14, display: "flex", alignItems: "center", gap: 6 },
-  input: {
-    background: "#0f0f0f",
-    border: "1px solid #333",
+    flex: "1 1 340px",
+    background: "var(--card)",
+    border: "1px solid var(--stone-line)",
+    padding: "24px 26px 28px",
     borderRadius: 4,
-    color: "#fff",
-    padding: "8px 10px",
-    fontSize: 14,
-    fontFamily: "inherit",
   },
-  error: { color: "#ff8a80", fontSize: 13, marginTop: 8 },
+  eyebrow: {
+    fontFamily: FONT_MONO,
+    fontSize: 10,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase" as const,
+    color: "var(--stone)",
+    marginBottom: 6,
+  },
+  h2: { color: "var(--ink)", fontSize: 19, fontFamily: FONT_DISPLAY, fontWeight: 500, margin: "0 0 14px" },
+  label: { color: "var(--stone)", fontSize: 12, fontFamily: FONT_MONO, letterSpacing: "0.03em", marginTop: 12 },
+  radioLabel: { color: "var(--ink-soft)", fontSize: 14, display: "flex", alignItems: "center", gap: 6 },
+  input: {
+    background: "var(--wall-raised)",
+    border: "1px solid var(--stone-line)",
+    borderRadius: 3,
+    color: "var(--ink)",
+    padding: "9px 11px",
+    fontSize: 14,
+    fontFamily: "'Work Sans', system-ui, sans-serif",
+  },
+  error: { color: "var(--oxblood)", fontSize: 13, marginTop: 8 },
   submitBtn: {
-    marginTop: 16,
-    background: "#7a2e2a",
+    marginTop: 18,
+    background: "var(--oxblood)",
     color: "#f5ede3",
     border: "none",
-    borderRadius: 4,
-    padding: "10px 16px",
+    borderRadius: 3,
+    padding: "11px 16px",
     fontSize: 14,
+    fontFamily: "'Work Sans', system-ui, sans-serif",
     cursor: "pointer",
   },
 };
