@@ -58,18 +58,24 @@ function timingSafeStringEqual(a, b) {
   return aBuf.length === bBuf.length && crypto.timingSafeEqual(aBuf, padded);
 }
 
+// Deliberately never sends a WWW-Authenticate response header: that header is
+// what tells the BROWSER (not just our own client code) to pop up its own
+// native username/password dialog on top of the page — for any request that
+// gets a 401 with it, including a fetch() that already sent a correct-looking
+// Authorization header. We use "Basic" purely as a credential-encoding format
+// between our own LoginForm and this middleware, not as an HTTP auth
+// challenge/response protocol, so that native prompt would only ever hijack
+// the custom login UI, never replace it usefully.
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
   const [scheme, encoded] = header.split(" ");
   if (scheme !== "Basic" || !encoded) {
-    res.set("WWW-Authenticate", 'Basic realm="museum-admin"');
     return res.status(401).json({ error: "Authentication required." });
   }
   const decoded = Buffer.from(encoded, "base64").toString("utf-8");
   const separatorIndex = decoded.indexOf(":");
   const password = separatorIndex === -1 ? "" : decoded.slice(separatorIndex + 1);
   if (!timingSafeStringEqual(password, ADMIN_PASSWORD)) {
-    res.set("WWW-Authenticate", 'Basic realm="museum-admin"');
     return res.status(401).json({ error: "Wrong password." });
   }
   next();
