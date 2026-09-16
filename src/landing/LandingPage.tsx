@@ -97,6 +97,47 @@ export function LandingPage() {
       });
     }
 
+    // Stats count-up: numbers climb from 0 to their real value once the
+    // stats row scrolls into view, instead of sitting there static.
+    const counters = document.querySelectorAll<HTMLElement>(".landing-page [data-count-to]");
+    let countIo: IntersectionObserver | undefined;
+    if (counters.length) {
+      const reduceMotion = !window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
+      const animateCounter = (el: HTMLElement) => {
+        const target = Number(el.dataset.countTo ?? "0");
+        const suffix = el.dataset.countSuffix ?? "";
+        if (reduceMotion || target === 0) {
+          el.textContent = `${target}${suffix}`;
+          return;
+        }
+        const duration = 1200;
+        const start = performance.now();
+        function tick(now: number) {
+          const progress = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = `${Math.round(eased * target)}${suffix}`;
+          if (progress < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      };
+      if (!("IntersectionObserver" in window)) {
+        counters.forEach(animateCounter);
+      } else {
+        countIo = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                animateCounter(entry.target as HTMLElement);
+                countIo?.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.4 },
+        );
+        counters.forEach((el) => countIo?.observe(el));
+      }
+    }
+
     // Scroll-scrubbed text: an illuminated-manuscript effect where a
     // paragraph's words light up in step with how far the reader has
     // scrolled past it, rather than all firing at once.
@@ -160,6 +201,7 @@ export function LandingPage() {
     return () => {
       btn?.removeEventListener("click", onToggleClick);
       io?.disconnect();
+      countIo?.disconnect();
       if (revealTimeout) window.clearTimeout(revealTimeout);
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
@@ -241,7 +283,7 @@ export function LandingPage() {
                 Enter the Museum
               </a>
               <a className="btn btn-ghost" href="#how">
-                How It's Built &rarr;
+                How It's Built <span className="arrow">&rarr;</span>
               </a>
             </div>
           </div>
@@ -255,21 +297,27 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ARTIST STRIP */}
+        {/* ARTIST STRIP — infinite marquee, paused on hover */}
         <section className="wrap artists framed reveal">
           <span className="label">Featured in this hang</span>
-          <div className="artist-list">
-            <span>Van Gogh</span>
-            <span>&middot;</span>
-            <span>Vermeer</span>
-            <span>&middot;</span>
-            <span>Hokusai</span>
-            <span>&middot;</span>
-            <span>da Vinci</span>
-            <span>&middot;</span>
-            <span>Monet</span>
-            <span>&middot;</span>
-            <span>Botticelli</span>
+          <div className="marquee-wrap">
+            <div className="marquee-track">
+              {[0, 1].map((copy) => (
+                <span key={copy} aria-hidden={copy === 1} style={{ display: "flex", gap: 30 }}>
+                  <span>Van Gogh</span>
+                  <span>&middot;</span>
+                  <span>Vermeer</span>
+                  <span>&middot;</span>
+                  <span>Hokusai</span>
+                  <span>&middot;</span>
+                  <span>da Vinci</span>
+                  <span>&middot;</span>
+                  <span>Monet</span>
+                  <span>&middot;</span>
+                  <span>Botticelli</span>
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -407,22 +455,22 @@ export function LandingPage() {
           ))}
         </div>
 
-        {/* STATS */}
+        {/* STATS — numbers count up from 0 when scrolled into view */}
         <div className="wrap stats framed reveal">
           <div className="stat">
-            <div className="num">6</div>
+            <div className="num" data-count-to="6">0</div>
             <div className="label cap">Masterworks</div>
           </div>
           <div className="stat">
-            <div className="num">3</div>
+            <div className="num" data-count-to="3">0</div>
             <div className="label cap">Galleries</div>
           </div>
           <div className="stat">
-            <div className="num">100%</div>
+            <div className="num" data-count-to="100" data-count-suffix="%">0%</div>
             <div className="label cap">Public Domain</div>
           </div>
           <div className="stat">
-            <div className="num">0</div>
+            <div className="num" data-count-to="0">0</div>
             <div className="label cap">Headsets Required</div>
           </div>
         </div>

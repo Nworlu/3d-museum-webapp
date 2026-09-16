@@ -105,6 +105,8 @@
 }
 .landing-page .btn:hover { transform: translateY(-1px); }
 .landing-page .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.landing-page .btn .arrow { display: inline-block; transition: transform 0.25s cubic-bezier(.16,.8,.24,1); }
+.landing-page .btn:hover .arrow { transform: translateX(4px); }
 .landing-page .btn-primary { background: var(--oxblood); color: #f5ede3; }
 .landing-page .btn-primary:hover { opacity: 0.92; }
 .landing-page .btn-ghost { border-color: var(--stone-line); color: var(--ink); background: transparent; }
@@ -273,23 +275,39 @@
   .landing-page .salon .p6 { display: none; }
 }
 
-/* ---------------- ARTIST STRIP ---------------- */
+/* ---------------- ARTIST STRIP (infinite marquee) ---------------- */
 .landing-page .artists {
   padding-block: 30px;
   display: flex;
   align-items: center;
   gap: 34px;
-  flex-wrap: wrap;
 }
 .landing-page .artists .label { flex: none; }
-.landing-page .artist-list {
+.landing-page .marquee-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+.landing-page .marquee-track {
   display: flex;
+  align-items: center;
   gap: 30px;
-  flex-wrap: wrap;
+  width: max-content;
   font-family: Cambria, Georgia, "Times New Roman", serif;
   font-style: italic;
   font-size: 1.05rem;
   color: var(--ink-soft);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing-page .marquee-track { animation: marquee-scroll 26s linear infinite; }
+  .landing-page .marquee-wrap:hover .marquee-track { animation-play-state: paused; }
+}
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 /* ---------------- FEATURE SECTIONS ---------------- */
