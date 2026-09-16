@@ -72,3 +72,11 @@ export function deleteExhibit(authHeader: string, roomId: string, exhibitId: str
     headers: { Authorization: authHeader },
   }).then((res) => unwrap<{ ok: true }>(res));
 }
+
+export function addRoom(authHeader: string, name: string): Promise<RoomSummary> {
+  return fetch("/api/admin/rooms", {
+    method: "POST",
+    headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  }).then((res) => unwrap<RoomSummary>(res));
+}

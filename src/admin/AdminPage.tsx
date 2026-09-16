@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AddExhibitForm } from "./AddExhibitForm";
+import { AddGalleryForm } from "./AddGalleryForm";
 import { basicAuthHeader, deleteExhibit, getRooms, AdminApiError, type RoomSummary } from "./api";
 
 const STORAGE_KEY = "museum-admin-auth";
@@ -36,6 +37,12 @@ export function AdminPage() {
     setLoadError(null);
   }
 
+  function handleLogout() {
+    sessionStorage.removeItem(STORAGE_KEY);
+    setAuthHeader(null);
+    setRooms(null);
+  }
+
   async function handleDelete(roomId: string, exhibitId: string) {
     if (!authHeader) return;
     if (!confirm(`Remove "${exhibitId}" from ${roomId}? This can't be undone.`)) return;
@@ -54,57 +61,98 @@ export function AdminPage() {
 
   if (!authHeader) return <LoginForm onLogin={handleLogin} />;
 
+  const exhibitCount = rooms?.reduce((sum, r) => sum + r.exhibits.length, 0) ?? 0;
+
   return (
     <div style={pageStyles.page}>
       <header style={pageStyles.header}>
-        <div style={pageStyles.eyebrow}>Backstage</div>
-        <h1 style={pageStyles.h1}>Museum Admin</h1>
-        <p style={pageStyles.sub}>Add or remove exhibits. Changes take effect on the next page load of the museum.</p>
+        <div style={pageStyles.headerTop}>
+          <div>
+            <div style={pageStyles.eyebrow}>Backstage</div>
+            <h1 style={pageStyles.h1}>Museum Admin</h1>
+          </div>
+          <button style={pageStyles.logoutBtn} onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
+        <p style={pageStyles.sub}>Add exhibits, open new galleries, and remove pieces — live on the next page load.</p>
       </header>
 
       {loadError && <p style={pageStyles.loadError}>{loadError}</p>}
 
       {rooms ? (
-        <div style={pageStyles.columns}>
-          <div style={pageStyles.roomsColumn}>
-            {rooms.map((room) => (
-              <section key={room.roomId} style={pageStyles.roomCard}>
-                <h2 style={pageStyles.roomTitle}>{room.roomId}</h2>
-                {room.exhibits.length === 0 && <p style={pageStyles.empty}>No exhibits yet.</p>}
-                <ul style={pageStyles.exhibitList}>
-                  {room.exhibits.map((exhibit) => (
-                    <li key={exhibit.id} style={pageStyles.exhibitRow}>
-                      {exhibit.imageUrl && <img src={exhibit.imageUrl} alt="" style={pageStyles.thumb} />}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={pageStyles.exhibitTitle}>{exhibit.title}</div>
-                        <div style={pageStyles.exhibitDesc}>{exhibit.description}</div>
-                      </div>
-                      <button
-                        style={pageStyles.deleteBtn}
-                        onClick={() => handleDelete(room.roomId, exhibit.id)}
-                        aria-label={`Remove ${exhibit.title}`}
-                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--oxblood)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--stone-line)")}
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
+        <>
+          <div style={pageStyles.statsRow}>
+            <div style={pageStyles.statCard}>
+              <div style={pageStyles.statNum}>{rooms.length}</div>
+              <div style={pageStyles.statCap}>Galleries</div>
+            </div>
+            <div style={pageStyles.statCard}>
+              <div style={pageStyles.statNum}>{exhibitCount}</div>
+              <div style={pageStyles.statCap}>Exhibits on view</div>
+            </div>
+            <div style={pageStyles.statCard}>
+              <div style={pageStyles.statNum}>{rooms.filter((r) => r.exhibits.length === 0).length}</div>
+              <div style={pageStyles.statCap}>Empty galleries</div>
+            </div>
           </div>
-          <AddExhibitForm
-            authHeader={authHeader}
-            rooms={rooms}
-            onAdded={(roomId, exhibit) =>
-              setRooms(
-                (prev) =>
-                  prev?.map((r) => (r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r)) ?? null,
-              )
-            }
-          />
-        </div>
+
+          <div style={pageStyles.columns}>
+            <div style={pageStyles.roomsGrid}>
+              {rooms.map((room) => (
+                <section key={room.roomId} style={pageStyles.roomCard}>
+                  <div style={pageStyles.roomCardHeader}>
+                    <h2 style={pageStyles.roomTitle}>{room.roomId}</h2>
+                    <span style={pageStyles.roomBadge}>{room.exhibits.length}</span>
+                  </div>
+                  <div style={pageStyles.roomBoundary}>
+                    z {room.boundary.minZ} to {room.boundary.maxZ}
+                  </div>
+                  {room.exhibits.length === 0 && <p style={pageStyles.empty}>No exhibits yet.</p>}
+                  <ul style={pageStyles.exhibitList}>
+                    {room.exhibits.map((exhibit) => (
+                      <li key={exhibit.id} style={pageStyles.exhibitRow}>
+                        {exhibit.imageUrl && <img src={exhibit.imageUrl} alt="" style={pageStyles.thumb} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={pageStyles.exhibitTitle}>{exhibit.title}</div>
+                          <div style={pageStyles.exhibitDesc}>{exhibit.description}</div>
+                        </div>
+                        <button
+                          style={pageStyles.deleteBtn}
+                          onClick={() => handleDelete(room.roomId, exhibit.id)}
+                          aria-label={`Remove ${exhibit.title}`}
+                          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--oxblood)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--stone-line)")}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+
+            <div style={pageStyles.sidebar}>
+              <AddGalleryForm
+                authHeader={authHeader}
+                onAdded={(room) => setRooms((prev) => [...(prev ?? []), room])}
+              />
+              <AddExhibitForm
+                authHeader={authHeader}
+                rooms={rooms}
+                onAdded={(roomId, exhibit) =>
+                  setRooms(
+                    (prev) =>
+                      prev?.map((r) =>
+                        r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r,
+                      ) ?? null,
+                  )
+                }
+              />
+            </div>
+          </div>
+        </>
       ) : (
         !loadError && <p style={pageStyles.loading}>Loading rooms…</p>
       )}
@@ -180,7 +228,8 @@ const pageStyles = {
     padding: "40px 44px 60px",
     fontFamily: "'Work Sans', system-ui, sans-serif",
   },
-  header: { marginBottom: 32, maxWidth: 640 },
+  header: { marginBottom: 28, maxWidth: 900 },
+  headerTop: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
   eyebrow: {
     fontFamily: FONT_MONO,
     fontSize: 11,
@@ -190,19 +239,69 @@ const pageStyles = {
     marginBottom: 10,
   },
   h1: { margin: 0, fontSize: 30, fontFamily: FONT_DISPLAY, fontWeight: 500 },
-  sub: { color: "var(--ink-soft)", fontSize: 14, marginTop: 10, lineHeight: 1.5 },
+  sub: { color: "var(--ink-soft)", fontSize: 14, marginTop: 10, lineHeight: 1.5, maxWidth: 640 },
+  logoutBtn: {
+    background: "none",
+    border: "1px solid var(--stone-line)",
+    color: "var(--ink-soft)",
+    borderRadius: 3,
+    padding: "8px 14px",
+    fontSize: 12,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.06em",
+    cursor: "pointer",
+    flex: "none",
+  },
   loadError: { color: "var(--oxblood)", fontSize: 14 },
   loading: { color: "var(--stone)", fontSize: 14 },
+  statsRow: { display: "flex", gap: 1, marginBottom: 32, background: "var(--stone-line)", borderRadius: 4, overflow: "hidden", flexWrap: "wrap" as const },
+  statCard: { flex: "1 1 160px", background: "var(--card)", padding: "18px 22px" },
+  statNum: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, color: "var(--ink)", fontVariantNumeric: "tabular-nums" as const },
+  statCap: {
+    marginTop: 4,
+    fontFamily: FONT_MONO,
+    fontSize: 11,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase" as const,
+    color: "var(--stone)",
+  },
   columns: { display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" as const },
-  roomsColumn: { display: "flex", flexDirection: "column" as const, gap: 20, flex: "1 1 480px", minWidth: 320 },
+  roomsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+    gap: 20,
+    flex: "1 1 560px",
+    minWidth: 280,
+    alignContent: "start",
+  },
+  sidebar: { display: "flex", flexDirection: "column" as const, gap: 20, flex: "0 0 360px", minWidth: 300 },
   roomCard: { background: "var(--card)", border: "1px solid var(--stone-line)", borderRadius: 4, padding: 22 },
+  roomCardHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 },
   roomTitle: {
-    margin: "0 0 14px",
+    margin: 0,
     fontSize: 13,
     fontFamily: FONT_MONO,
     textTransform: "uppercase" as const,
     letterSpacing: "0.1em",
     color: "var(--brass-bright)",
+  },
+  roomBadge: {
+    background: "var(--wall-raised)",
+    border: "1px solid var(--stone-line)",
+    color: "var(--ink-soft)",
+    borderRadius: 12,
+    padding: "2px 9px",
+    fontSize: 11,
+    fontFamily: FONT_MONO,
+    flex: "none",
+  },
+  roomBoundary: {
+    marginTop: 4,
+    marginBottom: 14,
+    fontSize: 11,
+    fontFamily: FONT_MONO,
+    color: "var(--stone)",
   },
   empty: { color: "var(--stone)", fontSize: 13, fontStyle: "italic" as const },
   exhibitList: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" as const, gap: 12 },

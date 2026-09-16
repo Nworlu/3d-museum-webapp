@@ -17,6 +17,7 @@ import multer from "multer";
 import { imageSize } from "image-size";
 import { ROOT, SRC_DIR, regenerateContent } from "../scripts/version-content.mjs";
 import { computeExhibitTransform, computeFrameSize, slugify, uniqueId } from "../scripts/exhibit-placement.mjs";
+import { computeNewRoomBoundary, findChainEnd } from "../scripts/gallery-placement.mjs";
 
 const PORT = process.env.ADMIN_PORT || 3001;
 const ART_DIR = join(ROOT, "public", "art");
@@ -69,6 +70,10 @@ function loadManifestSrc() {
   return JSON.parse(readFileSync(join(SRC_DIR, "museum-manifest.src.json"), "utf-8"));
 }
 
+function saveManifestSrc(manifest) {
+  writeFileSync(join(SRC_DIR, "museum-manifest.src.json"), JSON.stringify(manifest, null, 2) + "\n");
+}
+
 function loadRoomContent(contentFile) {
   return JSON.parse(readFileSync(join(SRC_DIR, contentFile), "utf-8"));
 }
@@ -95,6 +100,37 @@ app.get("/api/admin/rooms", (req, res) => {
     };
   });
   res.json({ rooms });
+});
+
+// POST /api/admin/rooms — add a new gallery at the end of the building. Body:
+// { name: string }. The new room is appended past whichever existing room
+// currently has the largest boundary.maxZ, matching that room's width and
+// depth, and wired into the adjacency chain (shared archway) automatically —
+// a curator never has to think in world coordinates.
+app.post("/api/admin/rooms", (req, res) => {
+  try {
+    const { name } = req.body ?? {};
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ error: "name is required." });
+    }
+
+    const manifest = loadManifestSrc();
+    const roomId = uniqueId(slugify(name), Object.keys(manifest.rooms));
+    const anchorRoomId = findChainEnd(manifest.rooms);
+    const boundary = computeNewRoomBoundary(manifest.rooms, anchorRoomId);
+    const contentFile = `${roomId}.json`;
+
+    manifest.rooms[anchorRoomId].adjacent.push(roomId);
+    manifest.rooms[roomId] = { boundary, adjacent: [anchorRoomId], contentFile };
+    saveManifestSrc(manifest);
+    saveRoomContent(contentFile, { exhibits: [] });
+    regenerateContent();
+
+    res.status(201).json({ roomId, boundary, exhibits: [] });
+  } catch (err) {
+    console.error("[admin] failed to add room:", err);
+    res.status(500).json({ error: "Failed to add gallery. See server logs." });
+  }
 });
 
 const upload = multer({
