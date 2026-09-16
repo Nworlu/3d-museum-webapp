@@ -330,10 +330,14 @@
   gap: 22px 28px;
 }
 .landing-page .grid-2x2 dt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-family: Cambria, Georgia, "Times New Roman", serif;
   font-weight: 500;
   font-size: 1.02rem;
 }
+.landing-page .dt-icon { color: var(--brass); flex: none; }
 .landing-page .grid-2x2 dd {
   margin: 6px 0 0;
   font-size: 0.9rem;
@@ -413,6 +417,7 @@
 }
 .landing-page .stat { text-align: center; padding-inline: 12px; border-left: 1px solid var(--stone-line); }
 .landing-page .stat:first-child { border-left: none; }
+.landing-page .stat-icon { color: var(--brass); margin-bottom: 10px; }
 .landing-page .stat .num {
   font-family: Cambria, Georgia, "Times New Roman", serif;
   font-size: clamp(1.9rem, 4vw, 2.6rem);
@@ -448,6 +453,7 @@
 }
 .landing-page .visit-card:first-child { border-left: none; }
 .landing-page .visit-card:hover { background: var(--wall-raised); }
+.landing-page .visit-icon { display: block; color: var(--brass); margin-bottom: 14px; }
 .landing-page .visit-card .status {
   display: inline-block;
   font-family: "IBM Plex Mono", monospace;

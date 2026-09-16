@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type FormEvent } from "react";
 import { AddExhibitForm } from "./AddExhibitForm";
 import { AddGalleryForm } from "./AddGalleryForm";
 import { AddSculptureForm } from "./AddSculptureForm";
@@ -13,14 +13,15 @@ import {
   type ActivityEvent,
   type RoomSummary,
 } from "./api";
+import { ArchIcon, ColumnsIcon, FrameIcon, LayoutIcon, PlusFrameIcon, type IconProps } from "../icons/MuseumIcons";
 
 const STORAGE_KEY = "museum-admin-auth";
 
-const NAV_ITEMS = [
-  { id: "top", label: "Dashboard" },
-  { id: "galleries", label: "Galleries" },
-  { id: "exhibits", label: "Exhibits" },
-  { id: "add-exhibit", label: "Add Exhibit" },
+const NAV_ITEMS: Array<{ id: string; label: string; icon: ComponentType<IconProps> }> = [
+  { id: "top", label: "Dashboard", icon: LayoutIcon },
+  { id: "galleries", label: "Galleries", icon: ColumnsIcon },
+  { id: "exhibits", label: "Exhibits", icon: FrameIcon },
+  { id: "add-exhibit", label: "Add Exhibit", icon: PlusFrameIcon },
 ];
 
 const ROOM_GRADIENTS = [
@@ -185,6 +186,7 @@ export function AdminPage() {
         <nav style={pageStyles.nav}>
           {NAV_ITEMS.map((item) => (
             <button key={item.id} style={pageStyles.navItem} onClick={() => scrollTo(item.id)}>
+              <item.icon size={17} style={pageStyles.navIcon} />
               {item.label}
             </button>
           ))}
@@ -236,16 +238,25 @@ export function AdminPage() {
             <>
               <div style={pageStyles.statsRow}>
                 <div style={pageStyles.statCard}>
-                  <div style={pageStyles.statNum}>{rooms.length}</div>
-                  <div style={pageStyles.statCap}>Galleries</div>
+                  <ColumnsIcon size={22} style={pageStyles.statIcon} />
+                  <div>
+                    <div style={pageStyles.statNum}>{rooms.length}</div>
+                    <div style={pageStyles.statCap}>Galleries</div>
+                  </div>
                 </div>
                 <div style={pageStyles.statCard}>
-                  <div style={pageStyles.statNum}>{exhibitCount}</div>
-                  <div style={pageStyles.statCap}>Exhibits on view</div>
+                  <FrameIcon size={22} style={pageStyles.statIcon} />
+                  <div>
+                    <div style={pageStyles.statNum}>{exhibitCount}</div>
+                    <div style={pageStyles.statCap}>Exhibits on view</div>
+                  </div>
                 </div>
                 <div style={pageStyles.statCard}>
-                  <div style={pageStyles.statNum}>{rooms.filter((r) => r.exhibits.length === 0).length}</div>
-                  <div style={pageStyles.statCap}>Empty galleries</div>
+                  <ArchIcon size={22} style={pageStyles.statIcon} />
+                  <div>
+                    <div style={pageStyles.statNum}>{rooms.filter((r) => r.exhibits.length === 0).length}</div>
+                    <div style={pageStyles.statCap}>Empty galleries</div>
+                  </div>
                 </div>
               </div>
 
@@ -514,6 +525,9 @@ const pageStyles = {
   brandLabel: { fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500, color: "var(--ink)" },
   nav: { display: "flex", flexDirection: "column" as const, gap: 2 },
   navItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
     textAlign: "left" as const,
     background: "none",
     border: "none",
@@ -524,6 +538,7 @@ const pageStyles = {
     fontFamily: "inherit",
     cursor: "pointer",
   },
+  navIcon: { color: "var(--brass)", flex: "none" },
   logoutBtn: {
     background: "none",
     border: "1px solid var(--stone-line)",
@@ -623,7 +638,8 @@ const pageStyles = {
     overflow: "hidden",
     flexWrap: "wrap" as const,
   },
-  statCard: { flex: "1 1 160px", background: "var(--card)", padding: "18px 22px" },
+  statCard: { flex: "1 1 160px", background: "var(--card)", padding: "18px 22px", display: "flex", alignItems: "center", gap: 14 },
+  statIcon: { color: "var(--brass)", flex: "none" },
   statNum: {
     fontFamily: FONT_DISPLAY,
     fontSize: 28,

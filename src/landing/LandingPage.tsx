@@ -1,5 +1,17 @@
 import { useEffect } from "react";
 import "./landing.css";
+import {
+  CheckIcon,
+  ColumnsIcon,
+  CompassIcon,
+  CursorIcon,
+  DesktopIcon,
+  FrameIcon,
+  LayersIcon,
+  PhoneIcon,
+  ShieldIcon,
+  VRIcon,
+} from "../icons/MuseumIcons";
 
 const WORDMARK_ICON = (
   <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
@@ -337,19 +349,27 @@ export function LandingPage() {
             </p>
             <dl className="grid-2x2">
               <div>
-                <dt>Walk &amp; Look Around</dt>
+                <dt>
+                  <CompassIcon size={18} className="dt-icon" /> Walk &amp; Look Around
+                </dt>
                 <dd>WASD to move, mouse to look — the same controls as any first-person walkthrough.</dd>
               </div>
               <div>
-                <dt>Click to Inspect</dt>
+                <dt>
+                  <CursorIcon size={18} className="dt-icon" /> Click to Inspect
+                </dt>
                 <dd>Click a piece and the camera dollies in as a wall label opens beside it.</dd>
               </div>
               <div>
-                <dt>Room-Based Streaming</dt>
+                <dt>
+                  <LayersIcon size={18} className="dt-icon" /> Room-Based Streaming
+                </dt>
                 <dd>Only the gallery you're standing in, plus the one next door, is ever loaded.</dd>
               </div>
               <div>
-                <dt>A Real Curator Dashboard</dt>
+                <dt>
+                  <ShieldIcon size={18} className="dt-icon" /> A Real Curator Dashboard
+                </dt>
                 <dd>Add or remove an exhibit from a password-protected admin page — no JSON, no redeploy.</dd>
               </div>
             </dl>
@@ -458,18 +478,22 @@ export function LandingPage() {
         {/* STATS — numbers count up from 0 when scrolled into view */}
         <div className="wrap stats framed reveal">
           <div className="stat">
+            <FrameIcon size={22} className="stat-icon" />
             <div className="num" data-count-to="6">0</div>
             <div className="label cap">Masterworks</div>
           </div>
           <div className="stat">
+            <ColumnsIcon size={22} className="stat-icon" />
             <div className="num" data-count-to="3">0</div>
             <div className="label cap">Galleries</div>
           </div>
           <div className="stat">
+            <CheckIcon size={22} className="stat-icon" />
             <div className="num" data-count-to="100" data-count-suffix="%">0%</div>
             <div className="label cap">Public Domain</div>
           </div>
           <div className="stat">
+            <VRIcon size={22} className="stat-icon" />
             <div className="num" data-count-to="0">0</div>
             <div className="label cap">Headsets Required</div>
           </div>
@@ -483,6 +507,7 @@ export function LandingPage() {
         </section>
         <div className="wrap visit-grid">
           <div className="visit-card reveal">
+            <DesktopIcon size={26} className="visit-icon" />
             <span className="status status-shipped">Shipped</span>
             <h3>On Desktop</h3>
             <p className="desc">Full walkthrough today: WASD movement, mouse-look, click-to-inspect, real collision.</p>
@@ -493,6 +518,7 @@ export function LandingPage() {
             </ul>
           </div>
           <div className="visit-card reveal">
+            <PhoneIcon size={26} className="visit-icon" />
             <span className="status status-progress">In Progress</span>
             <h3>On Tablet &amp; Phone</h3>
             <p className="desc">The renderer already runs on mobile GPUs — the on-screen joystick controls are next on the list.</p>
@@ -503,6 +529,7 @@ export function LandingPage() {
             </ul>
           </div>
           <div className="visit-card reveal">
+            <VRIcon size={26} className="visit-icon" />
             <span className="status status-planned">Designed For</span>
             <h3>In VR</h3>
             <p className="desc">Babylon.js ships WebXR support out of the box — the room-streaming architecture was built to carry it.</p>
