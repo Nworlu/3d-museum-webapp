@@ -13,6 +13,11 @@ import type { ExhibitData, ModelExhibit, PaintingExhibit, RoomContent } from "..
 
 const FRAME_BORDER = 0.08;
 const FRAME_DEPTH = 0.04;
+// A model exhibit's position.y is the pedestal's GROUND level (0 for a
+// floor-standing piece) — the loader adds PEDESTAL_HEIGHT so the model
+// sits on top of a real plinth instead of floating at floor level.
+const PEDESTAL_HEIGHT = 0.9;
+const PEDESTAL_RADIUS = 0.4;
 
 interface LoadedRoom {
   root: TransformNode;
@@ -109,7 +114,7 @@ export class ExhibitLoader {
     const instance = container.instantiateModelsToScene((name) => name, true);
     const root = (instance.rootNodes[0] as TransformNode | undefined) ?? new TransformNode(exhibit.id, this.scene);
     root.parent = parent;
-    root.position.set(exhibit.position.x, exhibit.position.y, exhibit.position.z);
+    root.position.set(exhibit.position.x, exhibit.position.y + PEDESTAL_HEIGHT, exhibit.position.z);
     root.scaling.setAll(exhibit.scale);
     for (const node of instance.rootNodes) {
       for (const mesh of node.getChildMeshes(false)) {
@@ -117,6 +122,20 @@ export class ExhibitLoader {
         mesh.isPickable = true;
       }
     }
+
+    const pedestal = MeshBuilder.CreateCylinder(
+      `pedestal:${exhibit.id}`,
+      { diameter: PEDESTAL_RADIUS * 2, height: PEDESTAL_HEIGHT, tessellation: 20 },
+      this.scene,
+    );
+    pedestal.parent = parent;
+    pedestal.position.set(exhibit.position.x, exhibit.position.y + PEDESTAL_HEIGHT / 2, exhibit.position.z);
+    pedestal.checkCollisions = true;
+    pedestal.isPickable = true;
+    pedestal.metadata = { exhibitTitle: exhibit.title, exhibitDescription: exhibit.description };
+    const pedestalMat = new StandardMaterial(`pedestal-mat:${exhibit.id}`, this.scene);
+    pedestalMat.diffuseColor = new Color3(0.58, 0.56, 0.53);
+    pedestal.material = pedestalMat;
   }
 
   /** A framed image plane mounted flush against a wall. */
@@ -174,7 +193,11 @@ export class ExhibitLoader {
 
   private createPlaceholder(exhibit: ExhibitData, parent: TransformNode): void {
     const box = MeshBuilder.CreateBox(`placeholder:${exhibit.id}`, { size: 0.6 }, this.scene);
-    box.position.set(exhibit.position.x, exhibit.position.y, exhibit.position.z);
+    // A model exhibit's position.y is pedestal ground level, not the visual
+    // center (see importModel) — lift the placeholder the same way so a
+    // failed sculpture load doesn't render half-sunk in the floor.
+    const y = exhibit.kind === "model" ? exhibit.position.y + PEDESTAL_HEIGHT : exhibit.position.y;
+    box.position.set(exhibit.position.x, y, exhibit.position.z);
     box.parent = parent;
     box.isPickable = true;
     const mat = new StandardMaterial(`placeholder-mat:${exhibit.id}`, this.scene);

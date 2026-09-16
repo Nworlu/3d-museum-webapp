@@ -153,6 +153,7 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
   const WALL_HEIGHT = 3;
   const WALL_THICKNESS = 0.3;
   const DOORWAY_WIDTH = 3.2;
+  const PILLAR_RADIUS = 0.22;
 
   /**
    * PLACEHOLDER building shell — still procedural (no hand-authored .glb
@@ -203,6 +204,45 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
 
     const wallMat = new StandardMaterial("wall-mat", scene);
     wallMat.diffuseColor = wallColor;
+
+    // Center pillar: a curator-toggleable decorative column (base, tapered
+    // shaft, capital) — classical-gallery detail, and a real physical
+    // obstacle (checkCollisions), not just visual.
+    const pillarMat = new StandardMaterial("pillar-mat", scene);
+    pillarMat.diffuseColor = new Color3(0.66, 0.64, 0.6);
+    const pillarAccentMat = new StandardMaterial("pillar-accent-mat", scene);
+    pillarAccentMat.diffuseColor = new Color3(0.62, 0.49, 0.26);
+
+    function buildPillar(roomId: string, boundary: MuseumManifest["rooms"][string]["boundary"]): void {
+      const cx = (boundary.minX + boundary.maxX) / 2;
+      const cz = (boundary.minZ + boundary.maxZ) / 2;
+      const baseHeight = 0.15;
+
+      const shaft = MeshBuilder.CreateCylinder(
+        `pillar-shaft:${roomId}`,
+        { diameterBottom: PILLAR_RADIUS * 2, diameterTop: PILLAR_RADIUS * 1.85, height: WALL_HEIGHT - baseHeight * 2, tessellation: 16 },
+        scene,
+      );
+      shaft.position.set(cx, WALL_HEIGHT / 2, cz);
+      shaft.checkCollisions = true;
+      shaft.material = pillarMat;
+
+      const base = MeshBuilder.CreateCylinder(
+        `pillar-base:${roomId}`,
+        { diameter: PILLAR_RADIUS * 2.9, height: baseHeight, tessellation: 16 },
+        scene,
+      );
+      base.position.set(cx, baseHeight / 2, cz);
+      base.checkCollisions = true;
+      base.material = pillarAccentMat;
+
+      const capital = base.clone(`pillar-capital:${roomId}`);
+      capital.position.y = WALL_HEIGHT - baseHeight / 2;
+    }
+
+    for (const [roomId, room] of Object.entries(manifest.rooms)) {
+      if (room.pillar) buildPillar(roomId, room.boundary);
+    }
 
     function buildWallSegment(name: string, x1: number, z1: number, x2: number, z2: number): void {
       const width = Math.max(Math.abs(x2 - x1), WALL_THICKNESS);

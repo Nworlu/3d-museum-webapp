@@ -9,6 +9,8 @@ export interface ManifestRoom {
   boundary: RoomBoundary;
   adjacent: string[];
   contentUrl: string;
+  /** Decorative center column, curator-toggleable per room. Absent = off. */
+  pillar?: boolean;
 }
 
 export interface MuseumManifest {

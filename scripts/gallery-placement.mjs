@@ -31,3 +31,47 @@ export function computeNewRoomBoundary(rooms, anchorRoomId) {
   const depth = maxZ - minZ;
   return { minX, maxX, minZ: maxZ, maxZ: maxZ + depth };
 }
+
+/**
+ * Recomputes the whole building's layout for a new gallery order, keeping
+ * each room's own width/depth but repositioning it along the line so the
+ * sequence matches `newOrder`. A room's own exhibits keep their local (x,
+ * relative-z-within-room) placement — only where the room itself sits
+ * along Z changes — so the caller needs to shift every exhibit's absolute
+ * position.z by `zDeltaByRoomId[roomId]` when applying this.
+ *
+ * @param {Record<string, {boundary:{minX:number,maxX:number,minZ:number,maxZ:number}}>} rooms
+ * @param {string[]} newOrder a permutation of every key in `rooms`
+ */
+export function computeReorderedLayout(rooms, newOrder) {
+  const roomIds = Object.keys(rooms);
+  const isPermutation =
+    newOrder.length === roomIds.length &&
+    new Set(newOrder).size === roomIds.length &&
+    roomIds.every((id) => newOrder.includes(id));
+  if (!isPermutation) {
+    throw new Error("newOrder must be a permutation of every existing room id");
+  }
+
+  const originZ = Math.min(...roomIds.map((id) => rooms[id].boundary.minZ));
+  let cursor = originZ;
+  /** @type {Record<string, {minX:number,maxX:number,minZ:number,maxZ:number}>} */
+  const boundaries = {};
+  /** @type {Record<string, string[]>} */
+  const adjacent = {};
+  /** @type {Record<string, number>} */
+  const zDeltaByRoomId = {};
+
+  newOrder.forEach((roomId, i) => {
+    const { minX, maxX, minZ, maxZ } = rooms[roomId].boundary;
+    const depth = maxZ - minZ;
+    const newMinZ = cursor;
+    const newMaxZ = cursor + depth;
+    boundaries[roomId] = { minX, maxX, minZ: newMinZ, maxZ: newMaxZ };
+    zDeltaByRoomId[roomId] = newMinZ - minZ;
+    adjacent[roomId] = [newOrder[i - 1], newOrder[i + 1]].filter((id) => id !== undefined);
+    cursor = newMaxZ;
+  });
+
+  return { boundaries, adjacent, zDeltaByRoomId, firstRoomId: newOrder[0] };
+}

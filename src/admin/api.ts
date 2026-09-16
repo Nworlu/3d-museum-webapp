@@ -9,11 +9,12 @@ export interface ExhibitSummary {
 export interface RoomSummary {
   roomId: string;
   boundary: { minX: number; maxX: number; minZ: number; maxZ: number };
+  pillar: boolean;
   exhibits: ExhibitSummary[];
 }
 
 export interface ActivityEvent {
-  type: "room-added" | "exhibit-added" | "exhibit-removed";
+  type: "room-added" | "room-updated" | "rooms-reordered" | "exhibit-added" | "exhibit-removed";
   message: string;
   at: string;
 }
@@ -91,4 +92,47 @@ export function addRoom(authHeader: string, name: string): Promise<RoomSummary> 
     headers: { Authorization: authHeader, "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   }).then((res) => unwrap<RoomSummary>(res));
+}
+
+export function setRoomPillar(authHeader: string, roomId: string, pillar: boolean): Promise<{ roomId: string; pillar: boolean }> {
+  return fetch(`/api/admin/rooms/${encodeURIComponent(roomId)}`, {
+    method: "PATCH",
+    headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    body: JSON.stringify({ pillar }),
+  }).then((res) => unwrap<{ roomId: string; pillar: boolean }>(res));
+}
+
+export function reorderRooms(authHeader: string, order: string[]): Promise<{ ok: true }> {
+  return fetch("/api/admin/rooms/reorder", {
+    method: "POST",
+    headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    body: JSON.stringify({ order }),
+  }).then((res) => unwrap<{ ok: true }>(res));
+}
+
+export function addSculpture(
+  authHeader: string,
+  fields: {
+    roomId: string;
+    side: "left" | "right";
+    offsetFraction: number;
+    scale: number;
+    title: string;
+    description: string;
+    model: File;
+  },
+): Promise<{ exhibit: ExhibitSummary }> {
+  const form = new FormData();
+  form.set("roomId", fields.roomId);
+  form.set("side", fields.side);
+  form.set("offsetFraction", String(fields.offsetFraction));
+  form.set("scale", String(fields.scale));
+  form.set("title", fields.title);
+  form.set("description", fields.description);
+  form.set("model", fields.model);
+  return fetch("/api/admin/sculptures", {
+    method: "POST",
+    headers: { Authorization: authHeader },
+    body: form,
+  }).then((res) => unwrap<{ exhibit: ExhibitSummary }>(res));
 }

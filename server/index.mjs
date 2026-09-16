@@ -20,14 +20,17 @@ import {
   clampHeightAboveFloor,
   computeExhibitTransform,
   computeFrameSize,
+  computeSculptureTransform,
   slugify,
   uniqueId,
 } from "../scripts/exhibit-placement.mjs";
-import { computeNewRoomBoundary, findChainEnd } from "../scripts/gallery-placement.mjs";
+import { computeNewRoomBoundary, computeReorderedLayout, findChainEnd } from "../scripts/gallery-placement.mjs";
 
 const PORT = process.env.ADMIN_PORT || 3001;
 const ART_DIR = join(ROOT, "public", "art");
+const MODEL_DIR = join(ROOT, "public", "models");
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const MAX_MODEL_UPLOAD_BYTES = 30 * 1024 * 1024; // .glb files run larger than a painting jpeg
 
 let ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 if (!ADMIN_PASSWORD) {
@@ -38,6 +41,7 @@ if (!ADMIN_PASSWORD) {
 }
 
 mkdirSync(ART_DIR, { recursive: true });
+mkdirSync(MODEL_DIR, { recursive: true });
 
 // Recent-activity feed for the dashboard's "History" panel — in-memory only
 // (resets on server restart). A curator's admin process is short-lived and
@@ -113,6 +117,7 @@ app.get("/api/admin/rooms", (req, res) => {
     return {
       roomId,
       boundary: room.boundary,
+      pillar: room.pillar ?? false,
       exhibits: content.exhibits.map((e) => ({
         id: e.id,
         kind: e.kind,
@@ -155,10 +160,85 @@ app.post("/api/admin/rooms", (req, res) => {
     regenerateContent();
     logActivity("room-added", `Opened gallery "${roomId}"`);
 
-    res.status(201).json({ roomId, boundary, exhibits: [] });
+    res.status(201).json({ roomId, boundary, pillar: false, exhibits: [] });
   } catch (err) {
     console.error("[admin] failed to add room:", err);
     res.status(500).json({ error: "Failed to add gallery. See server logs." });
+  }
+});
+
+// PATCH /api/admin/rooms/:roomId — currently only toggles the decorative
+// center pillar. Body: { pillar: boolean }.
+app.patch("/api/admin/rooms/:roomId", (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { pillar } = req.body ?? {};
+    if (typeof pillar !== "boolean") {
+      return res.status(400).json({ error: "pillar must be a boolean." });
+    }
+    const manifest = loadManifestSrc();
+    const room = manifest.rooms[roomId];
+    if (!room) return res.status(404).json({ error: `Unknown room "${roomId}".` });
+
+    room.pillar = pillar;
+    saveManifestSrc(manifest);
+    regenerateContent();
+    logActivity("room-updated", `${pillar ? "Added" : "Removed"} the center pillar in ${roomId}`);
+
+    res.json({ roomId, pillar });
+  } catch (err) {
+    console.error("[admin] failed to update room:", err);
+    res.status(500).json({ error: "Failed to update gallery. See server logs." });
+  }
+});
+
+// POST /api/admin/rooms/reorder — body: { order: string[] }, a permutation
+// of every room id. Recomputes every room's boundary/adjacency to match the
+// new sequence and shifts each room's exhibits' absolute z by the same
+// amount its room moved, so nothing drifts off its wall.
+app.post("/api/admin/rooms/reorder", (req, res) => {
+  try {
+    const { order } = req.body ?? {};
+    if (!Array.isArray(order) || !order.every((id) => typeof id === "string")) {
+      return res.status(400).json({ error: "order must be an array of room ids." });
+    }
+
+    const manifest = loadManifestSrc();
+    const originalEntryRoom = manifest.rooms[manifest.entryRoomId];
+    const entryOffset = manifest.spawnPoint.z - originalEntryRoom.boundary.minZ;
+
+    const { boundaries, adjacent, zDeltaByRoomId, firstRoomId } = computeReorderedLayout(manifest.rooms, order);
+
+    for (const [roomId, room] of Object.entries(manifest.rooms)) {
+      room.boundary = boundaries[roomId];
+      room.adjacent = adjacent[roomId];
+      const delta = zDeltaByRoomId[roomId];
+      if (delta !== 0) {
+        const content = loadRoomContent(room.contentFile);
+        content.exhibits.forEach((e) => {
+          e.position.z += delta;
+        });
+        saveRoomContent(room.contentFile, content);
+      }
+    }
+    // JS object key insertion order IS the display/iteration order everywhere
+    // this manifest is read (GET /api/admin/rooms, version-content.mjs) — the
+    // loop above only updated each room's fields in place, so without this
+    // rebuild the dashboard's gallery tiles would never visually reorder even
+    // though the underlying boundaries/adjacency are already correct.
+    const reordered = {};
+    for (const roomId of order) reordered[roomId] = manifest.rooms[roomId];
+    manifest.rooms = reordered;
+    manifest.entryRoomId = firstRoomId;
+    manifest.spawnPoint.z = boundaries[firstRoomId].minZ + entryOffset;
+    saveManifestSrc(manifest);
+    regenerateContent();
+    logActivity("rooms-reordered", `Reordered galleries: ${order.join(" → ")}`);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[admin] failed to reorder galleries:", err);
+    res.status(500).json({ error: "Failed to reorder galleries. See server logs." });
   }
 });
 
@@ -237,6 +317,75 @@ app.post("/api/admin/exhibits", upload.single("image"), (req, res) => {
   }
 });
 
+const modelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_MODEL_UPLOAD_BYTES },
+  fileFilter: (req, file, cb) => {
+    // Browsers report inconsistent (often empty or generic) MIME types for
+    // .glb, so the extension is the reliable check here, same as a curator
+    // would judge the file by its name.
+    if (!/\.glb$/i.test(file.originalname)) {
+      return cb(new Error("Only .glb files are accepted."));
+    }
+    cb(null, true);
+  },
+});
+
+// POST /api/admin/sculptures — add a floor-standing sculpture (a "model"
+// exhibit). multipart/form-data: model (file, .glb), roomId, side
+// ("left"|"right" of the room's center aisle), offsetFraction (-1..1),
+// scale, title, description. Rendered on an automatic pedestal
+// (ExhibitLoader) — no wall or height to pick, unlike a painting.
+app.post("/api/admin/sculptures", modelUpload.single("model"), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "A .glb model file is required." });
+    const { roomId, side, title, description } = req.body;
+    const offsetFraction = Number(req.body.offsetFraction);
+    const scale = Number(req.body.scale);
+    if (!roomId || !title || !description) {
+      return res.status(400).json({ error: "roomId, title, and description are required." });
+    }
+    if (side !== "left" && side !== "right") {
+      return res.status(400).json({ error: 'side must be "left" or "right".' });
+    }
+    if (!Number.isFinite(offsetFraction) || !Number.isFinite(scale) || scale <= 0) {
+      return res.status(400).json({ error: "offsetFraction must be a number and scale must be a positive number." });
+    }
+
+    const manifest = loadManifestSrc();
+    const room = manifest.rooms[roomId];
+    if (!room) return res.status(404).json({ error: `Unknown room "${roomId}".` });
+
+    const content = loadRoomContent(room.contentFile);
+    const existingIds = content.exhibits.map((e) => e.id);
+    const id = uniqueId(slugify(title), existingIds);
+
+    const { x, y, z } = computeSculptureTransform(room.boundary, side, offsetFraction);
+
+    const modelFilename = `${id}-${crypto.randomBytes(4).toString("hex")}.glb`;
+    writeFileSync(join(MODEL_DIR, modelFilename), req.file.buffer);
+
+    const exhibit = {
+      id,
+      kind: "model",
+      modelUrl: `/models/${modelFilename}`,
+      position: { x, y, z },
+      scale,
+      title,
+      description,
+    };
+    content.exhibits.push(exhibit);
+    saveRoomContent(room.contentFile, content);
+    regenerateContent();
+    logActivity("exhibit-added", `Added sculpture "${title}" to ${roomId}`);
+
+    res.status(201).json({ exhibit });
+  } catch (err) {
+    console.error("[admin] failed to add sculpture:", err);
+    res.status(500).json({ error: "Failed to add sculpture. See server logs." });
+  }
+});
+
 // DELETE /api/admin/exhibits/:roomId/:exhibitId
 app.delete("/api/admin/exhibits/:roomId/:exhibitId", (req, res) => {
   try {
@@ -254,19 +403,21 @@ app.delete("/api/admin/exhibits/:roomId/:exhibitId", (req, res) => {
     }
     saveRoomContent(room.contentFile, content);
 
-    // Best-effort cleanup: only delete the image file if this was the last
+    // Best-effort cleanup: only delete the asset file if this was the last
     // exhibit in the whole museum referencing it (a reused image, like the
     // duck-reprise pattern in the seed content, must survive).
-    if (removed?.kind === "painting" && removed.imageUrl?.startsWith("/art/")) {
+    const urlField = removed?.kind === "painting" ? "imageUrl" : removed?.kind === "model" ? "modelUrl" : null;
+    const removedUrl = urlField ? removed[urlField] : null;
+    if (removedUrl && (removedUrl.startsWith("/art/") || removedUrl.startsWith("/models/"))) {
       const stillReferenced = Object.values(manifest.rooms).some((r) => {
         const c = r.contentFile === room.contentFile ? content : loadRoomContent(r.contentFile);
-        return c.exhibits.some((e) => e.kind === "painting" && e.imageUrl === removed.imageUrl);
+        return c.exhibits.some((e) => e.kind === removed.kind && e[urlField] === removedUrl);
       });
       if (!stillReferenced) {
         try {
-          unlinkSync(join(ROOT, "public", removed.imageUrl.replace(/^\//, "")));
+          unlinkSync(join(ROOT, "public", removedUrl.replace(/^\//, "")));
         } catch {
-          // non-fatal — an orphaned file under public/art/ is a cheap cost
+          // non-fatal — an orphaned file under public/art/ or public/models/ is a cheap cost
         }
       }
     }

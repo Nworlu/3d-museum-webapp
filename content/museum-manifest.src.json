@@ -16,7 +16,8 @@
       "adjacent": [
         "gallery-1"
       ],
-      "contentFile": "lobby.json"
+      "contentFile": "lobby.json",
+      "pillar": true
     },
     "gallery-1": {
       "boundary": {
@@ -29,7 +30,8 @@
         "lobby",
         "gallery-2"
       ],
-      "contentFile": "gallery-1.json"
+      "contentFile": "gallery-1.json",
+      "pillar": true
     },
     "gallery-2": {
       "boundary": {
@@ -42,7 +44,8 @@
         "gallery-1",
         "modern-wing"
       ],
-      "contentFile": "gallery-2.json"
+      "contentFile": "gallery-2.json",
+      "pillar": true
     },
     "modern-wing": {
       "boundary": {
@@ -54,7 +57,8 @@
       "adjacent": [
         "gallery-2"
       ],
-      "contentFile": "modern-wing.json"
+      "contentFile": "modern-wing.json",
+      "pillar": true
     }
   }
 }

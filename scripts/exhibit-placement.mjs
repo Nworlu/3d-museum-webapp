@@ -4,6 +4,7 @@
 const WALL_INSET = 0.2; // meters in from the wall surface, matches the 6 hand-authored paintings (-5.8/5.8 on a -6/6 boundary)
 const TARGET_LONG_EDGE = 1.4; // meters, matches the hand-authored paintings
 const MIN_FLOOR_CLEARANCE = 0.05; // meters between a painting's bottom edge and the floor
+const SCULPTURE_LATERAL_OFFSET = 1.5; // meters off the room's center line, clear of a center pillar (radius ~0.3m)
 
 /**
  * `height` is the exhibit's vertical CENTER, so a curator-entered height
@@ -35,6 +36,27 @@ export function computeExhibitTransform(boundary, wall, offsetFraction, height) 
   const x = wall === "west" ? boundary.minX + WALL_INSET : boundary.maxX - WALL_INSET;
   const rotationY = wall === "west" ? -Math.PI / 2 : Math.PI / 2;
   return { x, y: height, z, rotationY };
+}
+
+/**
+ * Places a floor-standing sculpture along the room's center aisle, offset to
+ * one side so it never collides with a center pillar. Unlike a wall-hung
+ * painting, a sculpture is viewable from any angle, so no rotation is
+ * computed — ExhibitLoader always faces the model as authored.
+ *
+ * @param {{minX:number,maxX:number,minZ:number,maxZ:number}} boundary
+ * @param {"left"|"right"} side of the center aisle (facing +Z, i.e. toward higher offsetFraction)
+ * @param {number} offsetFraction -1 (start of the room) to 1 (end of the room)
+ */
+export function computeSculptureTransform(boundary, side, offsetFraction) {
+  if (side !== "left" && side !== "right") {
+    throw new Error(`side must be "left" or "right", got ${JSON.stringify(side)}`);
+  }
+  const clampedFraction = Math.max(-1, Math.min(1, offsetFraction));
+  const z = boundary.minZ + ((clampedFraction + 1) / 2) * (boundary.maxZ - boundary.minZ);
+  const centerX = (boundary.minX + boundary.maxX) / 2;
+  const x = side === "left" ? centerX - SCULPTURE_LATERAL_OFFSET : centerX + SCULPTURE_LATERAL_OFFSET;
+  return { x, y: 0, z, rotationY: 0 };
 }
 
 /**

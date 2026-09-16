@@ -3,6 +3,7 @@ import {
   clampHeightAboveFloor,
   computeExhibitTransform,
   computeFrameSize,
+  computeSculptureTransform,
   slugify,
   uniqueId,
 } from "../../scripts/exhibit-placement.mjs";
@@ -52,6 +53,29 @@ describe("clampHeightAboveFloor", () => {
   it("is a no-op for a short frame even at a low requested height", () => {
     // frameHeight 0.2 centered at 0.5 already clears the floor (bottom edge at 0.4)
     expect(clampHeightAboveFloor(0.5, 0.2)).toBe(0.5);
+  });
+});
+
+describe("computeSculptureTransform", () => {
+  it("places a left-side sculpture west of the room's center line", () => {
+    const t = computeSculptureTransform(LOBBY_BOUNDARY, "left", 0);
+    expect(t.x).toBeCloseTo(-1.5); // center (0) - 1.5m offset
+    expect(t.y).toBe(0);
+    expect(t.rotationY).toBe(0);
+  });
+
+  it("places a right-side sculpture east of the room's center line", () => {
+    const t = computeSculptureTransform(LOBBY_BOUNDARY, "right", 0);
+    expect(t.x).toBeCloseTo(1.5);
+  });
+
+  it("maps offsetFraction -1..1 onto the room's minZ..maxZ, same as a painting", () => {
+    expect(computeSculptureTransform(LOBBY_BOUNDARY, "left", -1).z).toBeCloseTo(-10);
+    expect(computeSculptureTransform(LOBBY_BOUNDARY, "left", 1).z).toBeCloseTo(0);
+  });
+
+  it("rejects a side value that isn't left or right", () => {
+    expect(() => computeSculptureTransform(LOBBY_BOUNDARY, "north" as never, 0)).toThrow();
   });
 });
 

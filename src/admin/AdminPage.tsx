@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AddExhibitForm } from "./AddExhibitForm";
 import { AddGalleryForm } from "./AddGalleryForm";
+import { AddSculptureForm } from "./AddSculptureForm";
 import {
   basicAuthHeader,
   deleteExhibit,
   getActivity,
   getRooms,
+  reorderRooms,
+  setRoomPillar,
   AdminApiError,
   type ActivityEvent,
   type RoomSummary,
@@ -46,6 +49,8 @@ function formatRelativeTime(iso: string): string {
 
 const ACTIVITY_DOT: Record<ActivityEvent["type"], string> = {
   "room-added": "var(--brass)",
+  "room-updated": "var(--stone)",
+  "rooms-reordered": "var(--stone)",
   "exhibit-added": "var(--brass-bright)",
   "exhibit-removed": "var(--oxblood)",
 };
@@ -117,6 +122,33 @@ export function AdminPage() {
       pushActivity("exhibit-removed", `Removed "${title}" from ${roomId}`);
     } catch (err) {
       alert(err instanceof AdminApiError ? err.message : "Failed to delete exhibit.");
+    }
+  }
+
+  async function handleMoveGallery(index: number, direction: -1 | 1) {
+    if (!authHeader || !rooms) return;
+    const target = index + direction;
+    if (target < 0 || target >= rooms.length) return;
+    const order = rooms.map((r) => r.roomId);
+    [order[index], order[target]] = [order[target], order[index]];
+    try {
+      await reorderRooms(authHeader, order);
+      const { rooms: fresh } = await getRooms(authHeader);
+      setRooms(fresh);
+      pushActivity("rooms-reordered", `Reordered galleries: ${order.join(" → ")}`);
+    } catch (err) {
+      alert(err instanceof AdminApiError ? err.message : "Failed to reorder galleries.");
+    }
+  }
+
+  async function handleTogglePillar(roomId: string, next: boolean) {
+    if (!authHeader) return;
+    try {
+      await setRoomPillar(authHeader, roomId, next);
+      setRooms((prev) => prev?.map((r) => (r.roomId === roomId ? { ...r, pillar: next } : r)) ?? null);
+      pushActivity("room-updated", `${next ? "Added" : "Removed"} the center pillar in ${roomId}`);
+    } catch (err) {
+      alert(err instanceof AdminApiError ? err.message : "Failed to update the gallery.");
     }
   }
 
@@ -222,24 +254,49 @@ export function AdminPage() {
                   <h2 style={pageStyles.sectionTitle}>Galleries</h2>
                 </div>
                 <div style={pageStyles.galleryRow}>
-                  {rooms.map((room) => (
-                    <button
-                      key={room.roomId}
-                      style={pageStyles.galleryTile}
-                      onClick={() => {
-                        setRoomFilter(room.roomId);
-                        scrollTo("exhibits");
-                      }}
-                    >
-                      <div style={{ ...pageStyles.galleryAvatar, background: gradientForRoom(room.roomId) }}>
-                        {room.roomId.slice(0, 2).toUpperCase()}
-                        <span style={pageStyles.galleryBadge}>{room.exhibits.length}</span>
+                  {rooms.map((room, index) => (
+                    <div key={room.roomId} style={pageStyles.galleryTile}>
+                      <button
+                        style={pageStyles.galleryTileButton}
+                        onClick={() => {
+                          setRoomFilter(room.roomId);
+                          scrollTo("exhibits");
+                        }}
+                      >
+                        <div style={{ ...pageStyles.galleryAvatar, background: gradientForRoom(room.roomId) }}>
+                          {room.roomId.slice(0, 2).toUpperCase()}
+                          <span style={pageStyles.galleryBadge}>{room.exhibits.length}</span>
+                        </div>
+                        <div style={pageStyles.galleryName}>{room.roomId}</div>
+                        <div style={pageStyles.galleryMeta}>
+                          z {room.boundary.minZ} to {room.boundary.maxZ}
+                        </div>
+                      </button>
+                      <div style={pageStyles.galleryOrderRow}>
+                        <button
+                          style={pageStyles.orderBtn}
+                          disabled={index === 0}
+                          aria-label={`Move ${room.roomId} earlier`}
+                          onClick={() => handleMoveGallery(index, -1)}
+                        >
+                          &lsaquo;
+                        </button>
+                        <button
+                          style={pageStyles.orderBtn}
+                          disabled={index === rooms.length - 1}
+                          aria-label={`Move ${room.roomId} later`}
+                          onClick={() => handleMoveGallery(index, 1)}
+                        >
+                          &rsaquo;
+                        </button>
                       </div>
-                      <div style={pageStyles.galleryName}>{room.roomId}</div>
-                      <div style={pageStyles.galleryMeta}>
-                        z {room.boundary.minZ} to {room.boundary.maxZ}
-                      </div>
-                    </button>
+                      <button
+                        style={room.pillar ? pageStyles.pillarToggleOn : pageStyles.pillarToggleOff}
+                        onClick={() => handleTogglePillar(room.roomId, !room.pillar)}
+                      >
+                        Pillar {room.pillar ? "On" : "Off"}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </section>
@@ -271,7 +328,11 @@ export function AdminPage() {
                   {visibleExhibits.map(({ roomId, exhibit }) => (
                     <div key={`${roomId}-${exhibit.id}`} style={pageStyles.exhibitCard}>
                       <div style={pageStyles.exhibitFrame}>
-                        {exhibit.imageUrl && <img src={exhibit.imageUrl} alt="" style={pageStyles.exhibitImg} />}
+                        {exhibit.imageUrl ? (
+                          <img src={exhibit.imageUrl} alt="" style={pageStyles.exhibitImg} />
+                        ) : exhibit.kind === "model" ? (
+                          <div style={pageStyles.sculpturePlaceholder}>Sculpture</div>
+                        ) : null}
                       </div>
                       <div style={pageStyles.exhibitCardBody}>
                         <div style={pageStyles.exhibitTitle}>{exhibit.title}</div>
@@ -298,19 +359,34 @@ export function AdminPage() {
                 <div style={pageStyles.sectionHeader}>
                   <h2 style={pageStyles.sectionTitle}>Add an exhibit</h2>
                 </div>
-                <AddExhibitForm
-                  authHeader={authHeader}
-                  rooms={rooms}
-                  onAdded={(roomId, exhibit) => {
-                    setRooms(
-                      (prev) =>
-                        prev?.map((r) =>
-                          r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r,
-                        ) ?? null,
-                    );
-                    pushActivity("exhibit-added", `Added "${exhibit.title}" to ${roomId}`);
-                  }}
-                />
+                <div style={pageStyles.formsRow}>
+                  <AddExhibitForm
+                    authHeader={authHeader}
+                    rooms={rooms}
+                    onAdded={(roomId, exhibit) => {
+                      setRooms(
+                        (prev) =>
+                          prev?.map((r) =>
+                            r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r,
+                          ) ?? null,
+                      );
+                      pushActivity("exhibit-added", `Added "${exhibit.title}" to ${roomId}`);
+                    }}
+                  />
+                  <AddSculptureForm
+                    authHeader={authHeader}
+                    rooms={rooms}
+                    onAdded={(roomId, exhibit) => {
+                      setRooms(
+                        (prev) =>
+                          prev?.map((r) =>
+                            r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r,
+                          ) ?? null,
+                      );
+                      pushActivity("exhibit-added", `Added sculpture "${exhibit.title}" to ${roomId}`);
+                    }}
+                  />
+                </div>
               </section>
             </>
           ) : (
@@ -564,11 +640,20 @@ const pageStyles = {
     color: "var(--stone)",
   },
   section: { marginBottom: 40 },
+  formsRow: { display: "flex", gap: 24, flexWrap: "wrap" as const },
   sectionHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 16, flexWrap: "wrap" as const },
   sectionHeaderTight: { marginBottom: 12 },
   sectionTitle: { margin: 0, fontSize: 17, fontFamily: FONT_DISPLAY, fontWeight: 500 },
   galleryRow: { display: "flex", gap: 18, overflowX: "auto" as const, paddingBottom: 4 },
   galleryTile: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    gap: 6,
+    flex: "none",
+    width: 108,
+  },
+  galleryTileButton: {
     background: "none",
     border: "none",
     cursor: "pointer",
@@ -576,9 +661,44 @@ const pageStyles = {
     flexDirection: "column" as const,
     alignItems: "center",
     gap: 8,
-    flex: "none",
-    width: 108,
+    padding: 0,
     fontFamily: "inherit",
+  },
+  galleryOrderRow: { display: "flex", gap: 6 },
+  orderBtn: {
+    background: "none",
+    border: "1px solid var(--stone-line)",
+    color: "var(--ink-soft)",
+    borderRadius: 3,
+    width: 26,
+    height: 22,
+    lineHeight: 1,
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  pillarToggleOn: {
+    background: "var(--brass)",
+    border: "1px solid var(--brass)",
+    color: "var(--wall)",
+    borderRadius: 12,
+    padding: "3px 10px",
+    fontSize: 10.5,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+  },
+  pillarToggleOff: {
+    background: "none",
+    border: "1px solid var(--stone-line)",
+    color: "var(--stone)",
+    borderRadius: 12,
+    padding: "3px 10px",
+    fontSize: 10.5,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
   },
   galleryAvatar: {
     position: "relative" as const,
@@ -642,6 +762,17 @@ const pageStyles = {
   },
   exhibitFrame: { aspectRatio: "4 / 3", background: "var(--wall-raised)" },
   exhibitImg: { width: "100%", height: "100%", objectFit: "cover" as const, display: "block" },
+  sculpturePlaceholder: {
+    width: "100%",
+    height: "100%",
+    display: "grid",
+    placeItems: "center",
+    color: "var(--stone)",
+    fontFamily: FONT_MONO,
+    fontSize: 11,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.08em",
+  },
   exhibitCardBody: { padding: "14px 16px 16px" },
   exhibitTitle: { fontSize: 14, fontFamily: FONT_DISPLAY, fontStyle: "italic" as const, color: "var(--ink)" },
   exhibitDesc: {
