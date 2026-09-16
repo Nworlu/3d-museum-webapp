@@ -26,7 +26,7 @@ declare global {
  * not just drift a little.
  */
 test("room transition during WASD movement does not block the render loop", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/museum");
   // Let boot settle (manifest + lobby/gallery-1 initial load) before measuring.
   await page.waitForTimeout(3000);
 

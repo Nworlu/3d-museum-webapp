@@ -27,8 +27,12 @@
         --card: #1e1a15;
         --shadow: rgba(0, 0, 0, 0.5);
       }
-      html, body, #root { margin: 0; height: 100%; overflow: hidden; background: var(--wall); }
+      html, body, #root { margin: 0; background: var(--wall); }
       body { font-family: "Work Sans", system-ui, sans-serif; }
+      /* Only the 3D museum canvas needs a fixed, non-scrolling viewport;
+         the landing page and admin dashboard scroll normally. */
+      body.app-fullscreen, body.app-fullscreen #root { height: 100%; overflow: hidden; }
+      html:has(body.app-fullscreen) { height: 100%; overflow: hidden; }
       #renderCanvas { width: 100%; height: 100%; display: block; touch-action: none; }
       #crosshair {
         position: fixed; top: 50%; left: 50%; width: 5px; height: 5px;

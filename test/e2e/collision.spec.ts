@@ -18,7 +18,7 @@ declare global {
  * (observed manually during MVP verification).
  */
 test("fast movement toward the perimeter wall does not tunnel through it", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/museum");
   await page.waitForTimeout(3000);
 
   const canvas = page.locator("#renderCanvas");

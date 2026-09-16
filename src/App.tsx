@@ -10,6 +10,11 @@ export function App() {
   const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
+    document.body.classList.add("app-fullscreen");
+    return () => document.body.classList.remove("app-fullscreen");
+  }, []);
+
+  useEffect(() => {
     if (!canvasRef.current) return;
     const controller = bootMuseum(canvasRef.current, {
       onInspectOpen: (exhibit) => setInspecting(exhibit),
