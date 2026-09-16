@@ -18,21 +18,20 @@ const LandingPage = lazy(() =>
 
 // const path = window.location.pathname;
 // const Page = path === "/admin" ? AdminPage : path === "/museum" ? App : LandingPage;
-import { createBrowserRouter } from "react-router";
-import { RouterProvider } from "react-router/dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <LandingPage />,
+    Component: LandingPage,
   },
   {
     path: "admin",
-    element: <AdminPage />,
+    Component: AdminPage,
   },
   {
     path: "/museum",
-    element: <App />,
+    Component: App,
   },
 ]);
 createRoot(document.getElementById("root")!).render(

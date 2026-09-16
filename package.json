@@ -25,7 +25,8 @@
     "multer": "^2.4.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router": "^8.4.0"
+    "react-router": "^8.4.0",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.5.0",
