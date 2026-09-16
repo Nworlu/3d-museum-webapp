@@ -22,6 +22,13 @@ const EYE_HEIGHT = 1.7;
 // treats touch-drag as camera rotation (it's on by default, no code needed
 // for that half); this just distinguishes "tapped" from "looked around".
 const TAP_MAX_DRAG_PX = 12;
+// Multiplier on a full-deflection joystick push, on top of camera.speed —
+// see the copyFrom comment below for why this no longer needs to be a
+// fraction of 1 to feel reasonable. 1 empirically lands close to WASD's own
+// felt walking pace (test/e2e/perf.spec.ts's comment notes ~4m in 5s
+// held-W, i.e. ~0.8 m/s; a held joystick at this value measured ~0.67 m/s
+// over 3s) — tune this single number if the pace should change.
+const JOYSTICK_SPEED_SCALE = 1;
 
 export interface ExhibitInfo {
   title: string;
@@ -346,16 +353,31 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
             }
           }
         } else {
-          if (moveVector.x !== 0 || moveVector.z !== 0) {
-            // Same recipe Babylon's own keyboard input uses internally
-            // (FreeCameraKeyboardMoveInput.checkInputs): a local-space
-            // move command, transformed into world space by the camera's
-            // current orientation, added to cameraDirection — the one
-            // public hook the base Camera class integrates into position
-            // (with collisions/gravity) every frame, whoever's driving it.
-            const localMove = new Vector3(moveVector.x * camera.speed, 0, moveVector.z * camera.speed);
+          const joystickMagnitude = Math.hypot(moveVector.x, moveVector.z);
+          if (joystickMagnitude > 0) {
+            // Quadratic response curve: a small nudge is much gentler than
+            // a linear mapping would give (0.5 deflection -> 0.25 * scale,
+            // not 0.5 * scale) — useful fine control since a thumb's small
+            // intentional nudges land on a fairly imprecise 52px radius.
+            const curvedSpeed = joystickMagnitude * joystickMagnitude * JOYSTICK_SPEED_SCALE;
+            const nx = (moveVector.x / joystickMagnitude) * curvedSpeed;
+            const nz = (moveVector.z / joystickMagnitude) * curvedSpeed;
+            const localMove = new Vector3(nx * camera.speed, 0, nz * camera.speed);
             const invView = Matrix.Invert(camera.getViewMatrix());
-            camera.cameraDirection.addInPlace(Vector3.TransformNormal(localMove, invView));
+            // Babylon's own keyboard input (FreeCameraKeyboardMoveInput)
+            // ADDS its per-frame move to cameraDirection, which then decays
+            // by camera.inertia (default 0.9) each frame rather than
+            // resetting — while a key/stick is held, that's a geometric
+            // series that settles at up to 1/(1-inertia), i.e. ~10x the
+            // intended per-frame value. Keyboard gets away with it because
+            // key-holds are usually short taps; a thumb pins a joystick for
+            // whole seconds, so addInPlace made it accelerate the longer it
+            // was held — copyFrom sets the target velocity outright instead
+            // of compounding onto it, so held-still-and-steady actually
+            // means constant speed. Inertia still applies AFTER release
+            // (this line simply isn't reached), so letting go still coasts
+            // to a stop instead of cutting off dead.
+            camera.cameraDirection.copyFrom(Vector3.TransformNormal(localMove, invView));
           }
           await roomManager.update(camera.position.x, camera.position.z);
         }
