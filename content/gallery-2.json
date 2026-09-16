@@ -4,7 +4,11 @@
       "id": "impression-sunrise",
       "kind": "painting",
       "imageUrl": "/art/impression-sunrise.jpg",
-      "position": { "x": -5.8, "y": 1.6, "z": 15 },
+      "position": {
+        "x": -5.8,
+        "y": 1.6,
+        "z": 25
+      },
       "rotationY": -1.5707963267948966,
       "width": 1.4,
       "height": 1.089,
@@ -15,7 +19,11 @@
       "id": "birth-of-venus",
       "kind": "painting",
       "imageUrl": "/art/birth-of-venus.jpg",
-      "position": { "x": 5.8, "y": 1.6, "z": 15 },
+      "position": {
+        "x": 5.8,
+        "y": 1.6,
+        "z": 25
+      },
       "rotationY": 1.5707963267948966,
       "width": 1.4,
       "height": 0.879,
@@ -26,7 +34,11 @@
       "id": "on-loan",
       "kind": "painting",
       "imageUrl": "/art/does-not-exist.jpg",
-      "position": { "x": 0, "y": 1.6, "z": 19.5 },
+      "position": {
+        "x": 0,
+        "y": 1.6,
+        "z": 29.5
+      },
       "rotationY": 3.141592653589793,
       "width": 1.2,
       "height": 1,

@@ -4,7 +4,11 @@
       "id": "starry-night",
       "kind": "painting",
       "imageUrl": "/art/starry-night.jpg",
-      "position": { "x": -5.8, "y": 1.6, "z": -5 },
+      "position": {
+        "x": -5.8,
+        "y": 1.6,
+        "z": 5
+      },
       "rotationY": -1.5707963267948966,
       "width": 1.4,
       "height": 1.109,
@@ -15,12 +19,25 @@
       "id": "mona-lisa",
       "kind": "painting",
       "imageUrl": "/art/mona-lisa.jpg",
-      "position": { "x": 5.8, "y": 1.6, "z": -5 },
+      "position": {
+        "x": 5.8,
+        "y": 1.6,
+        "z": 5
+      },
       "rotationY": 1.5707963267948966,
       "width": 0.925,
       "height": 1.4,
       "title": "Mona Lisa",
       "description": "Leonardo da Vinci, c. 1503. Oil on poplar panel. Public domain (Louvre)."
+    },
+    {
+      "id": "george-washington-bust",
+      "kind": "model",
+      "modelUrl": "/models/george-washington-bust-2ed46a4e.glb",
+      "position": { "x": 1.5, "y": 0, "z": 5 },
+      "scale": 1,
+      "title": "George Washington Bust",
+      "description": "Massimiliano Ravenna, c. 1819, copy after Giuseppe Ceracchi's 1792 original. Marble. Public domain (Smithsonian National Portrait Gallery, CC0)."
     }
   ]
 }

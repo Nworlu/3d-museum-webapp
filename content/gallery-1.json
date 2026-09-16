@@ -4,7 +4,11 @@
       "id": "girl-pearl-earring",
       "kind": "painting",
       "imageUrl": "/art/girl-pearl-earring.jpg",
-      "position": { "x": -5.8, "y": 1.6, "z": 5 },
+      "position": {
+        "x": -5.8,
+        "y": 1.6,
+        "z": 15
+      },
       "rotationY": -1.5707963267948966,
       "width": 1.182,
       "height": 1.4,
@@ -15,7 +19,11 @@
       "id": "great-wave",
       "kind": "painting",
       "imageUrl": "/art/great-wave.jpg",
-      "position": { "x": 5.8, "y": 1.6, "z": 5 },
+      "position": {
+        "x": 5.8,
+        "y": 1.6,
+        "z": 15
+      },
       "rotationY": 1.5707963267948966,
       "width": 1.4,
       "height": 0.941,
