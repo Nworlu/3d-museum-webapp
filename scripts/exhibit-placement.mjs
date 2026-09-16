@@ -3,6 +3,18 @@
 
 const WALL_INSET = 0.2; // meters in from the wall surface, matches the 6 hand-authored paintings (-5.8/5.8 on a -6/6 boundary)
 const TARGET_LONG_EDGE = 1.4; // meters, matches the hand-authored paintings
+const MIN_FLOOR_CLEARANCE = 0.05; // meters between a painting's bottom edge and the floor
+
+/**
+ * `height` is the exhibit's vertical CENTER, so a curator-entered height
+ * that's low relative to a tall frame can put the bottom edge below the
+ * floor (y=0) — the painting appears to sink into the ground. Raises the
+ * center just enough to keep MIN_FLOOR_CLEARANCE between the frame's
+ * bottom edge and the floor; leaves height untouched otherwise.
+ */
+export function clampHeightAboveFloor(height, frameHeight) {
+  return Math.max(height, frameHeight / 2 + MIN_FLOOR_CLEARANCE);
+}
 
 /**
  * Maps a curator-friendly {wall, offsetFraction, height} into the world-space
@@ -12,7 +24,7 @@ const TARGET_LONG_EDGE = 1.4; // meters, matches the hand-authored paintings
  * @param {{minX:number,maxX:number,minZ:number,maxZ:number}} boundary
  * @param {"west"|"east"} wall
  * @param {number} offsetFraction -1 (start of the wall) to 1 (end of the wall)
- * @param {number} height meters, eye-level default is 1.6
+ * @param {number} height meters, eye-level default is 1.6 — the exhibit's vertical center
  */
 export function computeExhibitTransform(boundary, wall, offsetFraction, height) {
   if (wall !== "west" && wall !== "east") {

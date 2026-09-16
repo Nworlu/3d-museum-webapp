@@ -16,7 +16,13 @@ import express from "express";
 import multer from "multer";
 import { imageSize } from "image-size";
 import { ROOT, SRC_DIR, regenerateContent } from "../scripts/version-content.mjs";
-import { computeExhibitTransform, computeFrameSize, slugify, uniqueId } from "../scripts/exhibit-placement.mjs";
+import {
+  clampHeightAboveFloor,
+  computeExhibitTransform,
+  computeFrameSize,
+  slugify,
+  uniqueId,
+} from "../scripts/exhibit-placement.mjs";
 import { computeNewRoomBoundary, findChainEnd } from "../scripts/gallery-placement.mjs";
 
 const PORT = process.env.ADMIN_PORT || 3001;
@@ -201,7 +207,8 @@ app.post("/api/admin/exhibits", upload.single("image"), (req, res) => {
       return res.status(400).json({ error: "Could not read image dimensions — file may be corrupt." });
     }
     const { width, height: frameHeight } = computeFrameSize(dims.width, dims.height);
-    const { x, y, z, rotationY } = computeExhibitTransform(room.boundary, wall, offsetFraction, height);
+    const safeHeight = clampHeightAboveFloor(height, frameHeight);
+    const { x, y, z, rotationY } = computeExhibitTransform(room.boundary, wall, offsetFraction, safeHeight);
 
     const ext = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" }[req.file.mimetype];
     const imageFilename = `${id}-${crypto.randomBytes(4).toString("hex")}${ext}`;

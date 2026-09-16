@@ -1,0 +1,19 @@
+{
+  "exhibits": [
+    {
+      "id": "the-night-cafe",
+      "kind": "painting",
+      "imageUrl": "/art/the-night-cafe-1e2f7275.jpg",
+      "position": {
+        "x": -5.8,
+        "y": 1.6,
+        "z": 25
+      },
+      "rotationY": -1.5707963267948966,
+      "width": 1.120486111111111,
+      "height": 1.4,
+      "title": "The night cafe",
+      "description": "Generated art"
+    }
+  ]
+}

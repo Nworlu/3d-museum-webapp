@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampHeightAboveFloor,
   computeExhibitTransform,
   computeFrameSize,
   slugify,
@@ -35,6 +36,22 @@ describe("computeExhibitTransform", () => {
 
   it("rejects a wall value that isn't west or east", () => {
     expect(() => computeExhibitTransform(LOBBY_BOUNDARY, "north" as never, 0, 1.6)).toThrow();
+  });
+});
+
+describe("clampHeightAboveFloor", () => {
+  it("leaves a height untouched when it already clears the floor", () => {
+    expect(clampHeightAboveFloor(1.6, 1.4)).toBe(1.6);
+  });
+
+  it("raises a too-low center so a tall frame's bottom edge clears the floor", () => {
+    // frameHeight 1.4 centered at 0.5 would put the bottom edge at -0.2 (below the floor)
+    expect(clampHeightAboveFloor(0.5, 1.4)).toBeCloseTo(0.75);
+  });
+
+  it("is a no-op for a short frame even at a low requested height", () => {
+    // frameHeight 0.2 centered at 0.5 already clears the floor (bottom edge at 0.4)
+    expect(clampHeightAboveFloor(0.5, 0.2)).toBe(0.5);
   });
 });
 

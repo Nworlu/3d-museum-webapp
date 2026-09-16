@@ -1,21 +1,60 @@
 {
   "entryRoomId": "lobby",
-  "spawnPoint": { "x": 0, "y": 1.7, "z": -4 },
+  "spawnPoint": {
+    "x": 0,
+    "y": 1.7,
+    "z": -4
+  },
   "rooms": {
     "lobby": {
-      "boundary": { "minX": -6, "maxX": 6, "minZ": -10, "maxZ": 0 },
-      "adjacent": ["gallery-1"],
+      "boundary": {
+        "minX": -6,
+        "maxX": 6,
+        "minZ": -10,
+        "maxZ": 0
+      },
+      "adjacent": [
+        "gallery-1"
+      ],
       "contentFile": "lobby.json"
     },
     "gallery-1": {
-      "boundary": { "minX": -6, "maxX": 6, "minZ": 0, "maxZ": 10 },
-      "adjacent": ["lobby", "gallery-2"],
+      "boundary": {
+        "minX": -6,
+        "maxX": 6,
+        "minZ": 0,
+        "maxZ": 10
+      },
+      "adjacent": [
+        "lobby",
+        "gallery-2"
+      ],
       "contentFile": "gallery-1.json"
     },
     "gallery-2": {
-      "boundary": { "minX": -6, "maxX": 6, "minZ": 10, "maxZ": 20 },
-      "adjacent": ["gallery-1"],
+      "boundary": {
+        "minX": -6,
+        "maxX": 6,
+        "minZ": 10,
+        "maxZ": 20
+      },
+      "adjacent": [
+        "gallery-1",
+        "modern-wing"
+      ],
       "contentFile": "gallery-2.json"
+    },
+    "modern-wing": {
+      "boundary": {
+        "minX": -6,
+        "maxX": 6,
+        "minZ": 20,
+        "maxZ": 30
+      },
+      "adjacent": [
+        "gallery-2"
+      ],
+      "contentFile": "modern-wing.json"
     }
   }
 }
