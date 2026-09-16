@@ -1,14 +1,62 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AddExhibitForm } from "./AddExhibitForm";
 import { AddGalleryForm } from "./AddGalleryForm";
-import { basicAuthHeader, deleteExhibit, getRooms, AdminApiError, type RoomSummary } from "./api";
+import {
+  basicAuthHeader,
+  deleteExhibit,
+  getActivity,
+  getRooms,
+  AdminApiError,
+  type ActivityEvent,
+  type RoomSummary,
+} from "./api";
 
 const STORAGE_KEY = "museum-admin-auth";
+
+const NAV_ITEMS = [
+  { id: "top", label: "Dashboard" },
+  { id: "galleries", label: "Galleries" },
+  { id: "exhibits", label: "Exhibits" },
+  { id: "add-exhibit", label: "Add Exhibit" },
+];
+
+const ROOM_GRADIENTS = [
+  "linear-gradient(135deg, var(--brass) 0%, var(--oxblood) 100%)",
+  "linear-gradient(135deg, var(--oxblood) 0%, var(--stone) 100%)",
+  "linear-gradient(135deg, var(--stone) 0%, var(--brass-bright) 100%)",
+  "linear-gradient(135deg, var(--brass-bright) 0%, var(--oxblood) 100%)",
+];
+
+function gradientForRoom(roomId: string): string {
+  let hash = 0;
+  for (let i = 0; i < roomId.length; i++) hash = (hash * 31 + roomId.charCodeAt(i)) >>> 0;
+  return ROOM_GRADIENTS[hash % ROOM_GRADIENTS.length];
+}
+
+function formatRelativeTime(iso: string): string {
+  const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (sec < 5) return "Just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.round(hr / 24)}d ago`;
+}
+
+const ACTIVITY_DOT: Record<ActivityEvent["type"], string> = {
+  "room-added": "var(--brass)",
+  "exhibit-added": "var(--brass-bright)",
+  "exhibit-removed": "var(--oxblood)",
+};
 
 export function AdminPage() {
   const [authHeader, setAuthHeader] = useState<string | null>(() => sessionStorage.getItem(STORAGE_KEY));
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [search, setSearch] = useState("");
+  const [roomFilter, setRoomFilter] = useState<string>("all");
 
   useEffect(() => {
     if (!authHeader) return;
@@ -26,10 +74,21 @@ export function AdminPage() {
           setLoadError(err instanceof Error ? err.message : "Failed to load rooms.");
         }
       });
+    getActivity(authHeader)
+      .then(({ activity }) => {
+        if (!cancelled) setActivity(activity);
+      })
+      .catch(() => {
+        /* the activity panel is a nicety — a failed fetch just leaves it empty */
+      });
     return () => {
       cancelled = true;
     };
   }, [authHeader]);
+
+  function pushActivity(type: ActivityEvent["type"], message: string) {
+    setActivity((prev) => [{ type, message, at: new Date().toISOString() }, ...prev].slice(0, 30));
+  }
 
   function handleLogin(header: string) {
     sessionStorage.setItem(STORAGE_KEY, header);
@@ -41,11 +100,12 @@ export function AdminPage() {
     sessionStorage.removeItem(STORAGE_KEY);
     setAuthHeader(null);
     setRooms(null);
+    setActivity([]);
   }
 
-  async function handleDelete(roomId: string, exhibitId: string) {
+  async function handleDelete(roomId: string, exhibitId: string, title: string) {
     if (!authHeader) return;
-    if (!confirm(`Remove "${exhibitId}" from ${roomId}? This can't be undone.`)) return;
+    if (!confirm(`Remove "${title}" from ${roomId}? This can't be undone.`)) return;
     try {
       await deleteExhibit(authHeader, roomId, exhibitId);
       setRooms(
@@ -54,108 +114,243 @@ export function AdminPage() {
             r.roomId === roomId ? { ...r, exhibits: r.exhibits.filter((e) => e.id !== exhibitId) } : r,
           ) ?? null,
       );
+      pushActivity("exhibit-removed", `Removed "${title}" from ${roomId}`);
     } catch (err) {
       alert(err instanceof AdminApiError ? err.message : "Failed to delete exhibit.");
     }
   }
 
-  if (!authHeader) return <LoginForm onLogin={handleLogin} />;
-
   const exhibitCount = rooms?.reduce((sum, r) => sum + r.exhibits.length, 0) ?? 0;
 
+  const visibleExhibits = useMemo(() => {
+    if (!rooms) return [];
+    const q = search.trim().toLowerCase();
+    return rooms
+      .filter((r) => roomFilter === "all" || r.roomId === roomFilter)
+      .flatMap((r) => r.exhibits.map((exhibit) => ({ roomId: r.roomId, exhibit })))
+      .filter(
+        ({ exhibit }) => !q || exhibit.title.toLowerCase().includes(q) || exhibit.description.toLowerCase().includes(q),
+      );
+  }, [rooms, search, roomFilter]);
+
+  if (!authHeader) return <LoginForm onLogin={handleLogin} />;
+
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
-    <div style={pageStyles.page}>
-      <header style={pageStyles.header}>
-        <div style={pageStyles.headerTop}>
-          <div>
+    <div style={pageStyles.shell}>
+      <aside style={pageStyles.sidebar}>
+        <div style={pageStyles.brand}>
+          <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+            <path d="M13 2 24 9v2H2V9L13 2Z" stroke="var(--brass)" strokeWidth="1.6" strokeLinejoin="round" />
+            <path d="M4 12v10M9 12v10M13 12v10M17 12v10M22 12v10" stroke="var(--brass)" strokeWidth="1.6" />
+            <path d="M2 24h22" stroke="var(--brass)" strokeWidth="1.6" />
+          </svg>
+          <span style={pageStyles.brandLabel}>Museum Admin</span>
+        </div>
+        <nav style={pageStyles.nav}>
+          {NAV_ITEMS.map((item) => (
+            <button key={item.id} style={pageStyles.navItem} onClick={() => scrollTo(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{ flex: 1 }} />
+        <button style={pageStyles.logoutBtn} onClick={handleLogout}>
+          Log out
+        </button>
+      </aside>
+
+      <div style={pageStyles.main}>
+        <div style={pageStyles.topbar}>
+          <div style={pageStyles.searchBox}>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ flex: "none" }}>
+              <circle cx="7" cy="7" r="5" stroke="var(--stone)" strokeWidth="1.4" />
+              <path d="M11 11 15 15" stroke="var(--stone)" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search exhibits"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={pageStyles.searchInput}
+            />
+          </div>
+          <div style={pageStyles.topbarRight}>
+            <div style={pageStyles.statChip}>
+              {exhibitCount} <span style={pageStyles.statChipLabel}>on view</span>
+            </div>
+            <div style={pageStyles.adminBadge}>
+              <div style={pageStyles.adminAvatar}>A</div>
+              <span>Admin</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="top" style={pageStyles.content}>
+          <div style={pageStyles.pageHeading}>
             <div style={pageStyles.eyebrow}>Backstage</div>
             <h1 style={pageStyles.h1}>Museum Admin</h1>
-          </div>
-          <button style={pageStyles.logoutBtn} onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-        <p style={pageStyles.sub}>Add exhibits, open new galleries, and remove pieces — live on the next page load.</p>
-      </header>
-
-      {loadError && <p style={pageStyles.loadError}>{loadError}</p>}
-
-      {rooms ? (
-        <>
-          <div style={pageStyles.statsRow}>
-            <div style={pageStyles.statCard}>
-              <div style={pageStyles.statNum}>{rooms.length}</div>
-              <div style={pageStyles.statCap}>Galleries</div>
-            </div>
-            <div style={pageStyles.statCard}>
-              <div style={pageStyles.statNum}>{exhibitCount}</div>
-              <div style={pageStyles.statCap}>Exhibits on view</div>
-            </div>
-            <div style={pageStyles.statCard}>
-              <div style={pageStyles.statNum}>{rooms.filter((r) => r.exhibits.length === 0).length}</div>
-              <div style={pageStyles.statCap}>Empty galleries</div>
-            </div>
+            <p style={pageStyles.sub}>
+              Add exhibits, open new galleries, and remove pieces — live on the next page load.
+            </p>
           </div>
 
-          <div style={pageStyles.columns}>
-            <div style={pageStyles.roomsGrid}>
-              {rooms.map((room) => (
-                <section key={room.roomId} style={pageStyles.roomCard}>
-                  <div style={pageStyles.roomCardHeader}>
-                    <h2 style={pageStyles.roomTitle}>{room.roomId}</h2>
-                    <span style={pageStyles.roomBadge}>{room.exhibits.length}</span>
-                  </div>
-                  <div style={pageStyles.roomBoundary}>
-                    z {room.boundary.minZ} to {room.boundary.maxZ}
-                  </div>
-                  {room.exhibits.length === 0 && <p style={pageStyles.empty}>No exhibits yet.</p>}
-                  <ul style={pageStyles.exhibitList}>
-                    {room.exhibits.map((exhibit) => (
-                      <li key={exhibit.id} style={pageStyles.exhibitRow}>
-                        {exhibit.imageUrl && <img src={exhibit.imageUrl} alt="" style={pageStyles.thumb} />}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={pageStyles.exhibitTitle}>{exhibit.title}</div>
-                          <div style={pageStyles.exhibitDesc}>{exhibit.description}</div>
-                        </div>
-                        <button
-                          style={pageStyles.deleteBtn}
-                          onClick={() => handleDelete(room.roomId, exhibit.id)}
-                          aria-label={`Remove ${exhibit.title}`}
-                          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--oxblood)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--stone-line)")}
-                        >
-                          Remove
-                        </button>
-                      </li>
+          {loadError && <p style={pageStyles.loadError}>{loadError}</p>}
+
+          {rooms ? (
+            <>
+              <div style={pageStyles.statsRow}>
+                <div style={pageStyles.statCard}>
+                  <div style={pageStyles.statNum}>{rooms.length}</div>
+                  <div style={pageStyles.statCap}>Galleries</div>
+                </div>
+                <div style={pageStyles.statCard}>
+                  <div style={pageStyles.statNum}>{exhibitCount}</div>
+                  <div style={pageStyles.statCap}>Exhibits on view</div>
+                </div>
+                <div style={pageStyles.statCard}>
+                  <div style={pageStyles.statNum}>{rooms.filter((r) => r.exhibits.length === 0).length}</div>
+                  <div style={pageStyles.statCap}>Empty galleries</div>
+                </div>
+              </div>
+
+              <section id="galleries" style={pageStyles.section}>
+                <div style={pageStyles.sectionHeader}>
+                  <h2 style={pageStyles.sectionTitle}>Galleries</h2>
+                </div>
+                <div style={pageStyles.galleryRow}>
+                  {rooms.map((room) => (
+                    <button
+                      key={room.roomId}
+                      style={pageStyles.galleryTile}
+                      onClick={() => {
+                        setRoomFilter(room.roomId);
+                        scrollTo("exhibits");
+                      }}
+                    >
+                      <div style={{ ...pageStyles.galleryAvatar, background: gradientForRoom(room.roomId) }}>
+                        {room.roomId.slice(0, 2).toUpperCase()}
+                        <span style={pageStyles.galleryBadge}>{room.exhibits.length}</span>
+                      </div>
+                      <div style={pageStyles.galleryName}>{room.roomId}</div>
+                      <div style={pageStyles.galleryMeta}>
+                        z {room.boundary.minZ} to {room.boundary.maxZ}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section id="exhibits" style={pageStyles.section}>
+                <div style={pageStyles.sectionHeader}>
+                  <h2 style={pageStyles.sectionTitle}>Exhibits</h2>
+                  <div style={pageStyles.tabs}>
+                    <button
+                      style={roomFilter === "all" ? pageStyles.tabActive : pageStyles.tab}
+                      onClick={() => setRoomFilter("all")}
+                    >
+                      All
+                    </button>
+                    {rooms.map((room) => (
+                      <button
+                        key={room.roomId}
+                        style={roomFilter === room.roomId ? pageStyles.tabActive : pageStyles.tab}
+                        onClick={() => setRoomFilter(room.roomId)}
+                      >
+                        {room.roomId}
+                      </button>
                     ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
+                  </div>
+                </div>
 
-            <div style={pageStyles.sidebar}>
-              <AddGalleryForm
-                authHeader={authHeader}
-                onAdded={(room) => setRooms((prev) => [...(prev ?? []), room])}
-              />
-              <AddExhibitForm
-                authHeader={authHeader}
-                rooms={rooms}
-                onAdded={(roomId, exhibit) =>
-                  setRooms(
-                    (prev) =>
-                      prev?.map((r) =>
-                        r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r,
-                      ) ?? null,
-                  )
-                }
-              />
-            </div>
+                {visibleExhibits.length === 0 && <p style={pageStyles.empty}>No exhibits match.</p>}
+                <div style={pageStyles.exhibitGrid}>
+                  {visibleExhibits.map(({ roomId, exhibit }) => (
+                    <div key={`${roomId}-${exhibit.id}`} style={pageStyles.exhibitCard}>
+                      <div style={pageStyles.exhibitFrame}>
+                        {exhibit.imageUrl && <img src={exhibit.imageUrl} alt="" style={pageStyles.exhibitImg} />}
+                      </div>
+                      <div style={pageStyles.exhibitCardBody}>
+                        <div style={pageStyles.exhibitTitle}>{exhibit.title}</div>
+                        <div style={pageStyles.exhibitDesc}>{exhibit.description}</div>
+                        <div style={pageStyles.exhibitCardFooter}>
+                          <span style={pageStyles.exhibitRoomTag}>{roomId}</span>
+                          <button
+                            style={pageStyles.deleteBtn}
+                            onClick={() => handleDelete(roomId, exhibit.id, exhibit.title)}
+                            aria-label={`Remove ${exhibit.title}`}
+                            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--oxblood)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--stone-line)")}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section id="add-exhibit" style={pageStyles.section}>
+                <div style={pageStyles.sectionHeader}>
+                  <h2 style={pageStyles.sectionTitle}>Add an exhibit</h2>
+                </div>
+                <AddExhibitForm
+                  authHeader={authHeader}
+                  rooms={rooms}
+                  onAdded={(roomId, exhibit) => {
+                    setRooms(
+                      (prev) =>
+                        prev?.map((r) =>
+                          r.roomId === roomId ? { ...r, exhibits: [...r.exhibits, exhibit] } : r,
+                        ) ?? null,
+                    );
+                    pushActivity("exhibit-added", `Added "${exhibit.title}" to ${roomId}`);
+                  }}
+                />
+              </section>
+            </>
+          ) : (
+            !loadError && <p style={pageStyles.loading}>Loading rooms…</p>
+          )}
+        </div>
+      </div>
+
+      <aside style={pageStyles.rightSidebar}>
+        {rooms && (
+          <AddGalleryForm
+            authHeader={authHeader}
+            onAdded={(room) => {
+              setRooms((prev) => [...(prev ?? []), room]);
+              pushActivity("room-added", `Opened gallery "${room.roomId}"`);
+            }}
+          />
+        )}
+
+        <div style={pageStyles.activityCard}>
+          <div style={pageStyles.sectionHeaderTight}>
+            <h2 style={pageStyles.sectionTitle}>Recent Activity</h2>
           </div>
-        </>
-      ) : (
-        !loadError && <p style={pageStyles.loading}>Loading rooms…</p>
-      )}
+          {activity.length === 0 ? (
+            <p style={pageStyles.empty}>Nothing yet this session.</p>
+          ) : (
+            <ul style={pageStyles.activityList}>
+              {activity.map((event, i) => (
+                <li key={i} style={pageStyles.activityRow}>
+                  <span style={{ ...pageStyles.activityDot, background: ACTIVITY_DOT[event.type] }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={pageStyles.activityMessage}>{event.message}</div>
+                    <div style={pageStyles.activityTime}>{formatRelativeTime(event.at)}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
@@ -221,43 +416,145 @@ const FONT_DISPLAY = "Cambria, Georgia, 'Times New Roman', serif";
 const FONT_MONO = "'IBM Plex Mono', ui-monospace, monospace";
 
 const pageStyles = {
-  page: {
+  shell: {
+    display: "flex",
     minHeight: "100%",
     background: "var(--wall)",
     color: "var(--ink)",
-    padding: "40px 44px 60px",
     fontFamily: "'Work Sans', system-ui, sans-serif",
   },
-  header: { marginBottom: 28, maxWidth: 900 },
-  headerTop: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
+  sidebar: {
+    flex: "0 0 220px",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 4,
+    padding: "26px 16px",
+    borderRight: "1px solid var(--stone-line)",
+    position: "sticky" as const,
+    top: 0,
+    height: "100vh",
+  },
+  brand: { display: "flex", alignItems: "center", gap: 9, padding: "0 10px", marginBottom: 22 },
+  brandLabel: { fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 500, color: "var(--ink)" },
+  nav: { display: "flex", flexDirection: "column" as const, gap: 2 },
+  navItem: {
+    textAlign: "left" as const,
+    background: "none",
+    border: "none",
+    color: "var(--ink-soft)",
+    padding: "10px 10px",
+    borderRadius: 4,
+    fontSize: 13.5,
+    fontFamily: "inherit",
+    cursor: "pointer",
+  },
+  logoutBtn: {
+    background: "none",
+    border: "1px solid var(--stone-line)",
+    color: "var(--ink-soft)",
+    borderRadius: 3,
+    padding: "9px 10px",
+    fontSize: 12,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.06em",
+    cursor: "pointer",
+  },
+  main: { flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column" as const },
+  topbar: {
+    position: "sticky" as const,
+    top: 0,
+    zIndex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "16px 32px",
+    borderBottom: "1px solid var(--stone-line)",
+    background: "color-mix(in srgb, var(--wall) 92%, transparent)",
+    backdropFilter: "blur(6px)",
+  },
+  searchBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: 9,
+    background: "var(--wall-raised)",
+    border: "1px solid var(--stone-line)",
+    borderRadius: 20,
+    padding: "8px 16px",
+    flex: "1 1 320px",
+    maxWidth: 420,
+  },
+  searchInput: {
+    border: "none",
+    background: "none",
+    outline: "none",
+    color: "var(--ink)",
+    fontSize: 13.5,
+    fontFamily: "inherit",
+    width: "100%",
+  },
+  topbarRight: { display: "flex", alignItems: "center", gap: 16, flex: "none" },
+  statChip: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: 5,
+    background: "var(--wall-raised)",
+    border: "1px solid var(--stone-line)",
+    borderRadius: 20,
+    padding: "8px 16px",
+    fontSize: 14,
+    fontFamily: FONT_DISPLAY,
+    fontWeight: 500,
+    fontVariantNumeric: "tabular-nums" as const,
+    whiteSpace: "nowrap" as const,
+  },
+  statChipLabel: { fontFamily: FONT_MONO, fontSize: 10, textTransform: "uppercase" as const, color: "var(--stone)" },
+  adminBadge: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-soft)" },
+  adminAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: "50%",
+    background: "var(--brass)",
+    color: "var(--wall)",
+    display: "grid",
+    placeItems: "center",
+    fontFamily: FONT_DISPLAY,
+    fontSize: 13,
+    fontWeight: 600,
+    flex: "none",
+  },
+  content: { padding: "28px 32px 60px", flex: 1 },
+  pageHeading: { marginBottom: 24, maxWidth: 640 },
   eyebrow: {
     fontFamily: FONT_MONO,
     fontSize: 11,
     letterSpacing: "0.14em",
     textTransform: "uppercase" as const,
     color: "var(--stone)",
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  h1: { margin: 0, fontSize: 30, fontFamily: FONT_DISPLAY, fontWeight: 500 },
-  sub: { color: "var(--ink-soft)", fontSize: 14, marginTop: 10, lineHeight: 1.5, maxWidth: 640 },
-  logoutBtn: {
-    background: "none",
-    border: "1px solid var(--stone-line)",
-    color: "var(--ink-soft)",
-    borderRadius: 3,
-    padding: "8px 14px",
-    fontSize: 12,
-    fontFamily: FONT_MONO,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.06em",
-    cursor: "pointer",
-    flex: "none",
-  },
+  h1: { margin: 0, fontSize: 26, fontFamily: FONT_DISPLAY, fontWeight: 500 },
+  sub: { color: "var(--ink-soft)", fontSize: 13.5, marginTop: 8, lineHeight: 1.5 },
   loadError: { color: "var(--oxblood)", fontSize: 14 },
   loading: { color: "var(--stone)", fontSize: 14 },
-  statsRow: { display: "flex", gap: 1, marginBottom: 32, background: "var(--stone-line)", borderRadius: 4, overflow: "hidden", flexWrap: "wrap" as const },
+  statsRow: {
+    display: "flex",
+    gap: 1,
+    marginBottom: 36,
+    background: "var(--stone-line)",
+    borderRadius: 4,
+    overflow: "hidden",
+    flexWrap: "wrap" as const,
+  },
   statCard: { flex: "1 1 160px", background: "var(--card)", padding: "18px 22px" },
-  statNum: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 500, color: "var(--ink)", fontVariantNumeric: "tabular-nums" as const },
+  statNum: {
+    fontFamily: FONT_DISPLAY,
+    fontSize: 28,
+    fontWeight: 500,
+    color: "var(--ink)",
+    fontVariantNumeric: "tabular-nums" as const,
+  },
   statCap: {
     marginTop: 4,
     fontFamily: FONT_MONO,
@@ -266,76 +563,136 @@ const pageStyles = {
     textTransform: "uppercase" as const,
     color: "var(--stone)",
   },
-  columns: { display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" as const },
-  roomsGrid: {
+  section: { marginBottom: 40 },
+  sectionHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 16, flexWrap: "wrap" as const },
+  sectionHeaderTight: { marginBottom: 12 },
+  sectionTitle: { margin: 0, fontSize: 17, fontFamily: FONT_DISPLAY, fontWeight: 500 },
+  galleryRow: { display: "flex", gap: 18, overflowX: "auto" as const, paddingBottom: 4 },
+  galleryTile: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    gap: 8,
+    flex: "none",
+    width: 108,
+    fontFamily: "inherit",
+  },
+  galleryAvatar: {
+    position: "relative" as const,
+    width: 72,
+    height: 72,
+    borderRadius: "50%",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-    gap: 20,
-    flex: "1 1 560px",
-    minWidth: 280,
-    alignContent: "start",
+    placeItems: "center",
+    color: "#fff",
+    fontFamily: FONT_DISPLAY,
+    fontWeight: 600,
+    fontSize: 20,
+    border: "2px solid var(--stone-line)",
   },
-  sidebar: { display: "flex", flexDirection: "column" as const, gap: 20, flex: "0 0 360px", minWidth: 300 },
-  roomCard: { background: "var(--card)", border: "1px solid var(--stone-line)", borderRadius: 4, padding: 22 },
-  roomCardHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  roomTitle: {
-    margin: 0,
-    fontSize: 13,
+  galleryBadge: {
+    position: "absolute" as const,
+    bottom: -4,
+    right: -4,
+    background: "var(--card)",
+    border: "1px solid var(--stone-line)",
+    color: "var(--ink)",
+    borderRadius: 10,
+    padding: "1px 7px",
+    fontSize: 11,
     fontFamily: FONT_MONO,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.1em",
-    color: "var(--brass-bright)",
   },
-  roomBadge: {
-    background: "var(--wall-raised)",
+  galleryName: { fontSize: 13, color: "var(--ink)", fontWeight: 500 },
+  galleryMeta: { fontSize: 10.5, fontFamily: FONT_MONO, color: "var(--stone)" },
+  tabs: { display: "flex", gap: 6, flexWrap: "wrap" as const },
+  tab: {
+    background: "none",
     border: "1px solid var(--stone-line)",
     color: "var(--ink-soft)",
-    borderRadius: 12,
-    padding: "2px 9px",
-    fontSize: 11,
+    borderRadius: 20,
+    padding: "6px 14px",
+    fontSize: 12,
     fontFamily: FONT_MONO,
-    flex: "none",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
   },
-  roomBoundary: {
-    marginTop: 4,
-    marginBottom: 14,
-    fontSize: 11,
+  tabActive: {
+    background: "var(--brass)",
+    border: "1px solid var(--brass)",
+    color: "var(--wall)",
+    borderRadius: 20,
+    padding: "6px 14px",
+    fontSize: 12,
     fontFamily: FONT_MONO,
-    color: "var(--stone)",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
   },
   empty: { color: "var(--stone)", fontSize: 13, fontStyle: "italic" as const },
-  exhibitList: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" as const, gap: 12 },
-  exhibitRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    borderTop: "1px solid var(--stone-line)",
-    paddingTop: 12,
+  exhibitGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 18 },
+  exhibitCard: {
+    background: "var(--card)",
+    border: "1px solid var(--stone-line)",
+    borderRadius: 4,
+    overflow: "hidden",
   },
-  thumb: { width: 46, height: 46, objectFit: "cover" as const, borderRadius: 2, flex: "none", border: "1px solid var(--stone-line)" },
+  exhibitFrame: { aspectRatio: "4 / 3", background: "var(--wall-raised)" },
+  exhibitImg: { width: "100%", height: "100%", objectFit: "cover" as const, display: "block" },
+  exhibitCardBody: { padding: "14px 16px 16px" },
   exhibitTitle: { fontSize: 14, fontFamily: FONT_DISPLAY, fontStyle: "italic" as const, color: "var(--ink)" },
   exhibitDesc: {
     fontSize: 12,
     color: "var(--stone)",
+    marginTop: 4,
     overflow: "hidden",
     textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
-    marginTop: 2,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical" as const,
+  },
+  exhibitCardFooter: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
+  exhibitRoomTag: {
+    fontSize: 10.5,
+    fontFamily: FONT_MONO,
+    textTransform: "uppercase" as const,
+    color: "var(--brass-bright)",
+    letterSpacing: "0.05em",
   },
   deleteBtn: {
     background: "none",
     border: "1px solid var(--stone-line)",
     color: "var(--ink-soft)",
     borderRadius: 3,
-    padding: "6px 12px",
+    padding: "5px 11px",
     fontSize: 11,
     fontFamily: FONT_MONO,
     textTransform: "uppercase" as const,
     letterSpacing: "0.04em",
     cursor: "pointer",
-    flex: "none",
     transition: "border-color 0.15s ease",
   },
+  rightSidebar: {
+    flex: "0 0 320px",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 20,
+    padding: "26px 24px",
+    borderLeft: "1px solid var(--stone-line)",
+    position: "sticky" as const,
+    top: 0,
+    height: "100vh",
+    overflowY: "auto" as const,
+  },
+  activityCard: { background: "var(--card)", border: "1px solid var(--stone-line)", borderRadius: 4, padding: "20px 22px" },
+  activityList: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" as const, gap: 14 },
+  activityRow: { display: "flex", alignItems: "flex-start", gap: 10 },
+  activityDot: { width: 8, height: 8, borderRadius: "50%", marginTop: 5, flex: "none" },
+  activityMessage: { fontSize: 12.5, color: "var(--ink)", lineHeight: 1.4 },
+  activityTime: { fontSize: 11, color: "var(--stone)", fontFamily: FONT_MONO, marginTop: 2 },
 };
 
 const loginStyles = {

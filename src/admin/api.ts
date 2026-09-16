@@ -12,6 +12,12 @@ export interface RoomSummary {
   exhibits: ExhibitSummary[];
 }
 
+export interface ActivityEvent {
+  type: "room-added" | "exhibit-added" | "exhibit-removed";
+  message: string;
+  at: string;
+}
+
 export class AdminApiError extends Error {
   constructor(
     message: string,
@@ -71,6 +77,12 @@ export function deleteExhibit(authHeader: string, roomId: string, exhibitId: str
     method: "DELETE",
     headers: { Authorization: authHeader },
   }).then((res) => unwrap<{ ok: true }>(res));
+}
+
+export function getActivity(authHeader: string): Promise<{ activity: ActivityEvent[] }> {
+  return fetch("/api/admin/activity", { headers: { Authorization: authHeader } }).then((res) =>
+    unwrap<{ activity: ActivityEvent[] }>(res),
+  );
 }
 
 export function addRoom(authHeader: string, name: string): Promise<RoomSummary> {

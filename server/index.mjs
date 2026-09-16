@@ -33,6 +33,17 @@ if (!ADMIN_PASSWORD) {
 
 mkdirSync(ART_DIR, { recursive: true });
 
+// Recent-activity feed for the dashboard's "History" panel — in-memory only
+// (resets on server restart). A curator's admin process is short-lived and
+// single-instance, so this doesn't need to survive a restart or be shared
+// across processes; it's a nicety, not a system of record.
+const ACTIVITY_LIMIT = 30;
+const activityLog = [];
+function logActivity(type, message) {
+  activityLog.unshift({ type, message, at: new Date().toISOString() });
+  activityLog.length = Math.min(activityLog.length, ACTIVITY_LIMIT);
+}
+
 const app = express();
 app.use(express.json());
 
@@ -102,6 +113,11 @@ app.get("/api/admin/rooms", (req, res) => {
   res.json({ rooms });
 });
 
+// GET /api/admin/activity — recent curator actions, newest first.
+app.get("/api/admin/activity", (req, res) => {
+  res.json({ activity: activityLog });
+});
+
 // POST /api/admin/rooms — add a new gallery at the end of the building. Body:
 // { name: string }. The new room is appended past whichever existing room
 // currently has the largest boundary.maxZ, matching that room's width and
@@ -125,6 +141,7 @@ app.post("/api/admin/rooms", (req, res) => {
     saveManifestSrc(manifest);
     saveRoomContent(contentFile, { exhibits: [] });
     regenerateContent();
+    logActivity("room-added", `Opened gallery "${roomId}"`);
 
     res.status(201).json({ roomId, boundary, exhibits: [] });
   } catch (err) {
@@ -198,6 +215,7 @@ app.post("/api/admin/exhibits", upload.single("image"), (req, res) => {
     content.exhibits.push(exhibit);
     saveRoomContent(room.contentFile, content);
     regenerateContent();
+    logActivity("exhibit-added", `Added "${title}" to ${roomId}`);
 
     res.status(201).json({ exhibit });
   } catch (err) {
@@ -241,6 +259,7 @@ app.delete("/api/admin/exhibits/:roomId/:exhibitId", (req, res) => {
     }
 
     regenerateContent();
+    logActivity("exhibit-removed", `Removed "${removed?.title ?? exhibitId}" from ${roomId}`);
     res.json({ ok: true });
   } catch (err) {
     console.error("[admin] failed to delete exhibit:", err);
