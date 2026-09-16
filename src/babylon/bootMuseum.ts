@@ -3,6 +3,7 @@ import {
   Color4,
   Engine,
   HemisphericLight,
+  Matrix,
   MeshBuilder,
   Scene,
   StandardMaterial,
@@ -16,6 +17,11 @@ import type { MuseumManifest } from "../types";
 const DOLLY_DURATION_MS = 450;
 const DOLLY_STAND_BACK = 2.2;
 const EYE_HEIGHT = 1.7;
+// A touch that moves less than this before lifting is a tap (inspect),
+// not a look-drag — mirrors how Babylon's own FreeCameraMouseInput already
+// treats touch-drag as camera rotation (it's on by default, no code needed
+// for that half); this just distinguishes "tapped" from "looked around".
+const TAP_MAX_DRAG_PX = 12;
 
 export interface ExhibitInfo {
   title: string;
@@ -34,6 +40,12 @@ export interface MuseumCallbacks {
 export interface MuseumController {
   /** Begin the return dolly and re-enable camera control. Call when the UI closes the panel. */
   closeInspect: () => void;
+  /**
+   * Drive walking from a virtual joystick instead of WASD: x is strafe
+   * (-1 left .. 1 right), z is forward/back (-1 back .. 1 forward), both
+   * camera-relative. Call with (0, 0) when the joystick is released.
+   */
+  setMoveVector: (x: number, z: number) => void;
   /** Tear down the engine/scene and all listeners. Call on unmount. */
   dispose: () => void;
 }
@@ -92,6 +104,9 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
   let preInspectPosition: Vector3 | null = null;
   let inspecting = false;
   let disposed = false;
+  const moveVector = new Vector3(0, 0, 0); // joystick input, camera-relative (x: strafe, z: forward)
+  let touchStartX = 0;
+  let touchStartY = 0;
 
   function startDolly(to: Vector3, returning: boolean): void {
     dolly = { from: camera.position.clone(), to, t: 0, returning };
@@ -103,12 +118,8 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
     startDolly(preInspectPosition, true);
   }
 
-  scene.onPointerDown = (evt) => {
-    if (evt.button !== 0) return;
-    if (document.pointerLockElement !== canvas) {
-      canvas.requestPointerLock();
-      return;
-    }
+  /** Pick whatever's centered on screen (the crosshair) and start the inspect dolly if it's an exhibit. */
+  function tryInspect(): void {
     if (dolly || inspecting) return;
 
     const pick = scene.pick(engine.getRenderWidth() / 2, engine.getRenderHeight() / 2);
@@ -128,8 +139,37 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
     camera.detachControl();
     roomManager.onInspectStart();
     inspecting = true;
+    // The React-side joystick unmounts while inspecting (no UI for it on
+    // the inspect panel), so it never gets a touchend to zero itself out —
+    // clear it here instead of leaving a stale vector for movement to
+    // suddenly resume from once the return dolly re-attaches control.
+    moveVector.set(0, 0, 0);
     startDolly(target, false);
     callbacks.onInspectOpen({ title, description });
+  }
+
+  scene.onPointerDown = (evt) => {
+    if (evt.button !== 0) return;
+    if (evt.pointerType === "touch") {
+      // No pointer-lock equivalent on touch — Babylon's own touch-drag
+      // already rotates the camera (FreeCameraMouseInput.touchEnabled
+      // defaults to true), so this only needs to remember where the touch
+      // started to tell a tap from a look-drag on release.
+      touchStartX = evt.clientX;
+      touchStartY = evt.clientY;
+      return;
+    }
+    if (document.pointerLockElement !== canvas) {
+      canvas.requestPointerLock();
+      return;
+    }
+    tryInspect();
+  };
+
+  scene.onPointerUp = (evt) => {
+    if (evt.pointerType !== "touch") return;
+    const dragDistance = Math.hypot(evt.clientX - touchStartX, evt.clientY - touchStartY);
+    if (dragDistance <= TAP_MAX_DRAG_PX) tryInspect();
   };
 
   const onPointerLockChange = () => {
@@ -306,6 +346,17 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
             }
           }
         } else {
+          if (moveVector.x !== 0 || moveVector.z !== 0) {
+            // Same recipe Babylon's own keyboard input uses internally
+            // (FreeCameraKeyboardMoveInput.checkInputs): a local-space
+            // move command, transformed into world space by the camera's
+            // current orientation, added to cameraDirection — the one
+            // public hook the base Camera class integrates into position
+            // (with collisions/gravity) every frame, whoever's driving it.
+            const localMove = new Vector3(moveVector.x * camera.speed, 0, moveVector.z * camera.speed);
+            const invView = Matrix.Invert(camera.getViewMatrix());
+            camera.cameraDirection.addInPlace(Vector3.TransformNormal(localMove, invView));
+          }
           await roomManager.update(camera.position.x, camera.position.z);
         }
 
@@ -319,6 +370,7 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
 
   return {
     closeInspect,
+    setMoveVector: (x, z) => moveVector.set(x, 0, z),
     dispose: () => {
       disposed = true;
       document.removeEventListener("pointerlockchange", onPointerLockChange);

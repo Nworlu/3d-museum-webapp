@@ -52,6 +52,31 @@
         padding: 8px 16px;
         border-radius: 3px;
         pointer-events: none;
+        max-width: calc(100vw - 32px);
+        text-align: center;
+      }
+      #touchJoystick {
+        position: fixed;
+        left: max(24px, env(safe-area-inset-left));
+        bottom: max(28px, env(safe-area-inset-bottom));
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--card) 55%, transparent);
+        border: 1px solid var(--stone-line);
+        touch-action: none;
+      }
+      #touchJoystickKnob {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 56px;
+        height: 56px;
+        margin: -28px 0 0 -28px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--brass) 65%, transparent);
+        border: 1px solid var(--brass-bright);
+        pointer-events: none;
       }
     </style>
   </head>

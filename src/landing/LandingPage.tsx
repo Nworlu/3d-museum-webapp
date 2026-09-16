@@ -519,13 +519,13 @@ export function LandingPage() {
           </div>
           <div className="visit-card reveal">
             <PhoneIcon size={26} className="visit-icon" />
-            <span className="status status-progress">In Progress</span>
+            <span className="status status-shipped">Shipped</span>
             <h3>On Tablet &amp; Phone</h3>
-            <p className="desc">The renderer already runs on mobile GPUs — the on-screen joystick controls are next on the list.</p>
+            <p className="desc">Full walkthrough on touch too: drag to look, an on-screen joystick to walk, tap to inspect.</p>
             <ul>
               <li>Touch-drag to look</li>
               <li>Virtual joystick to walk</li>
-              <li>KTX2 textures for GPU memory</li>
+              <li>Same collision, same room streaming</li>
             </ul>
           </div>
           <div className="visit-card reveal">
@@ -590,7 +590,7 @@ export function LandingPage() {
               <summary>
                 Does it work on my phone? <span className="icon">+</span>
               </summary>
-              <p>The 3D renders fine on mobile hardware today; the touch controls to actually walk around are still being built (see "Visit Modes" above).</p>
+              <p>Yes — drag to look around, use the on-screen joystick to walk, and tap a piece to inspect it. Same museum, same collision, touch-native controls.</p>
             </details>
             <details className="faq">
               <summary>
