@@ -33,6 +33,59 @@ this room's boundary" utility.
 **Depends on:** v1 shipped (needs `museum-manifest.json` boundary volumes
 and the `content/` schema to exist first).
 
+**Update (2026-09-16):** partially superseded by the admin API
+(`server/index.mjs`) — a curator adding exhibits through `/admin` can't
+place one outside its room's boundary at all, since `computeExhibitTransform`
+(`scripts/exhibit-placement.mjs`) derives world coordinates from a
+wall + fraction-along-wall, not raw numbers. This checker is now only
+needed for the direct-JSON-editing path, which still exists (no
+validation stops a hand-edited `content/*.json` from placing something
+badly) — reduced urgency, not closed.
+
+## Admin
+
+### Edit exhibit in place
+
+**What:** Let a curator update an existing exhibit's title, description,
+or position through `/admin` instead of only add/remove.
+
+**Why:** Right now fixing a typo in a wall label means deleting the
+exhibit and re-adding it from scratch (re-uploading the image, redoing
+the wall/position picks). Fine for the current 6-exhibit scale, annoying
+past that.
+
+**Context:** Deferred out of the first admin-API pass to keep the
+write surface small (add + delete covers "publish new content" and
+"take something down," the two most common curator actions) while this
+is genuinely new form/API surface, not a small addition.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None — the data model already supports it.
+
+### Admin auth hardening before a real deployment
+
+**What:** Before `server/index.mjs` runs anywhere besides localhost:
+rate-limit login attempts, require the API sit behind HTTPS (Basic Auth
+sends the password on every request — fine over TLS, not fine in the
+clear), and consider a real session/token instead of resending the
+password on every call.
+
+**Why:** The current auth (HTTP Basic, a single shared password, no
+rate limiting) is appropriately minimal for a local dev tool a solo
+curator runs on their own machine — it would not be appropriately
+minimal for a public-facing deployment.
+
+**Context:** Flagged at build time, not discovered later — the auth
+model was a deliberate v1 scope call (see DESIGN.md Key Decision #10),
+not an oversight. Revisit before `server/index.mjs` is ever exposed
+past localhost.
+
+**Effort:** M
+**Priority:** P1 (before any non-local deployment); N/A until then
+**Depends on:** A decision to actually deploy the admin API somewhere
+reachable off the curator's own machine.
+
 ## Performance
 
 ### Real-device KTX2 memory verification

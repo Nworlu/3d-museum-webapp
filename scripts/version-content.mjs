@@ -12,22 +12,26 @@
 //
 // Run before dev/build (wired as npm's predev/prebuild); safe to re-run any
 // time, always regenerates public/content/ from the current source.
+//
+// Exported as regenerateContent() so server/index.mjs (the admin API) can
+// call the exact same logic after writing a new exhibit — one implementation
+// of "source -> served content", not two that could drift.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SRC_DIR = join(ROOT, "content");
-const OUT_DIR = join(ROOT, "public", "content");
+export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+export const SRC_DIR = join(ROOT, "content");
+export const OUT_DIR = join(ROOT, "public", "content");
 const HASH_LENGTH = 8;
 
 function hashOf(bytes) {
   return createHash("sha256").update(bytes).digest("hex").slice(0, HASH_LENGTH);
 }
 
-function main() {
+export function regenerateContent() {
   const srcManifestPath = join(SRC_DIR, "museum-manifest.src.json");
   const srcManifest = JSON.parse(readFileSync(srcManifestPath, "utf-8"));
 
@@ -53,8 +57,11 @@ function main() {
   };
   writeFileSync(join(OUT_DIR, "museum-manifest.json"), JSON.stringify(outManifest, null, 2) + "\n");
 
-  const roomCount = Object.keys(outRooms).length;
-  console.log(`[version-content] wrote ${roomCount} room file(s) + museum-manifest.json to public/content/`);
+  return { roomCount: Object.keys(outRooms).length };
 }
 
-main();
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  const { roomCount } = regenerateContent();
+  console.log(`[version-content] wrote ${roomCount} room file(s) + museum-manifest.json to public/content/`);
+}

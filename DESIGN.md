@@ -227,6 +227,23 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
    world, since there was nothing to collide with beyond the building's
    nominal boundary. `T8`'s collision E2E test (`test/e2e/collision.spec.ts`)
    exercises this directly.
+10. **A small write-only admin API supersedes half of Key Decision #1** —
+    the museum itself is still 100% static (visitors never talk to a
+    server), but curating exhibits without hand-editing JSON now goes
+    through `server/index.mjs`, a minimal Express API behind HTTP Basic
+    Auth (`/admin` in the React app). It writes to `content/*.json` and
+    `public/art/`, then calls the *same* `regenerateContent()` function
+    the CLI build step uses (`scripts/version-content.mjs`) — one
+    implementation of "source → served content," not two that could
+    drift. Placement math (wall → world transform, image aspect ratio →
+    physical frame size, title → unique slug) lives in
+    `scripts/exhibit-placement.mjs`, a dependency-free pure module kept
+    separate specifically so it's unit-testable without spinning up the
+    server (`test/unit/exhibit-placement.test.ts`). A real deployment
+    runs this API on a small always-on host or serverless function,
+    entirely separate from whatever serves the static museum — the
+    admin surface is a maintenance/ops concern, not something that
+    affects visitor-facing performance or caching.
 
 ### Content sourcing
 
@@ -435,7 +452,15 @@ failure and its current coverage:
   strategy).
 - Content: a `content/` directory of static JSON files (one per room),
   served as-is by Vite/static hosting at `/content/<roomId>.json` — this
-  IS the CMS interface, not a mock of one. No custom server code.
+  IS the CMS interface, not a mock of one. No custom server code on the
+  read path (see Key Decision #10 for the admin write path).
+- Admin: `npm run server` starts the write-only API on port 3001 (set
+  `ADMIN_PORT` to change it); `npm run dev` proxies `/api/*` to it, so
+  `/admin` works out of the box in dev. Set `ADMIN_PASSWORD` yourself for
+  a stable password across restarts — otherwise the server generates and
+  prints a random one every time it starts. `npm run dev:admin` starts
+  both (Unix shells only — background job control via `&`; on Windows
+  run `npm run server` and `npm run dev` in two terminals instead).
 - Exhibit textures authored/exported as KTX2 (Basis Universal) for GPU
   memory budget on mobile — verify peak transcode memory on real
   low-end-target devices before locking this in as the only path (see
