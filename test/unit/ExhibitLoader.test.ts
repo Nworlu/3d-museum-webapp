@@ -1,7 +1,7 @@
 import { NullEngine, Scene, TransformNode } from "@babylonjs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExhibitLoader } from "../../src/loader/ExhibitLoader";
-import type { ExhibitData, RoomContent } from "../../src/types";
+import type { ModelExhibit, RoomContent } from "../../src/types";
 
 const loadAssetContainerAsync = vi.fn();
 
@@ -15,9 +15,10 @@ vi.mock("@babylonjs/core", async (importOriginal) => {
 
 vi.mock("@babylonjs/loaders/glTF", () => ({}));
 
-function exhibit(overrides: Partial<ExhibitData> = {}): ExhibitData {
+function exhibit(overrides: Partial<ModelExhibit> = {}): ModelExhibit {
   return {
     id: "e1",
+    kind: "model",
     modelUrl: "https://example.test/model.glb",
     position: { x: 0, y: 1, z: 0 },
     scale: 1,

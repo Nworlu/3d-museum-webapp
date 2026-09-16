@@ -17,14 +17,31 @@ export interface MuseumManifest {
   rooms: Record<string, ManifestRoom>;
 }
 
-export interface ExhibitData {
+interface ExhibitBase {
   id: string;
-  modelUrl: string;
   position: { x: number; y: number; z: number };
-  scale: number;
   title: string;
   description: string;
 }
+
+export interface ModelExhibit extends ExhibitBase {
+  kind: "model";
+  modelUrl: string;
+  scale: number;
+}
+
+/** A framed image mounted flush against a wall. */
+export interface PaintingExhibit extends ExhibitBase {
+  kind: "painting";
+  imageUrl: string;
+  /** Physical size in meters. */
+  width: number;
+  height: number;
+  /** Radians — rotates the picture to face into the room from its wall. */
+  rotationY: number;
+}
+
+export type ExhibitData = ModelExhibit | PaintingExhibit;
 
 export interface RoomContent {
   exhibits: ExhibitData[];

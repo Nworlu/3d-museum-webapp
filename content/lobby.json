@@ -1,20 +1,26 @@
 {
   "exhibits": [
     {
-      "id": "duck",
-      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb",
-      "position": { "x": -2, "y": 1, "z": -6 },
-      "scale": 1,
-      "title": "Untitled (Duck)",
-      "description": "A classic glTF sample model, used as a placeholder exhibit while the real collection is authored."
+      "id": "starry-night",
+      "kind": "painting",
+      "imageUrl": "/art/starry-night.jpg",
+      "position": { "x": -5.8, "y": 1.6, "z": -5 },
+      "rotationY": -1.5707963267948966,
+      "width": 1.4,
+      "height": 1.109,
+      "title": "The Starry Night",
+      "description": "Vincent van Gogh, 1889. Oil on canvas. Public domain (Museum of Modern Art)."
     },
     {
-      "id": "boombox",
-      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoomBox/glTF-Binary/BoomBox.glb",
-      "position": { "x": 2, "y": 1, "z": -6 },
-      "scale": 40,
-      "title": "Boombox Study",
-      "description": "Placeholder exhibit — demonstrates a small, high-detail model scaled up for display."
+      "id": "mona-lisa",
+      "kind": "painting",
+      "imageUrl": "/art/mona-lisa.jpg",
+      "position": { "x": 5.8, "y": 1.6, "z": -5 },
+      "rotationY": 1.5707963267948966,
+      "width": 0.925,
+      "height": 1.4,
+      "title": "Mona Lisa",
+      "description": "Leonardo da Vinci, c. 1503. Oil on poplar panel. Public domain (Louvre)."
     }
   ]
 }

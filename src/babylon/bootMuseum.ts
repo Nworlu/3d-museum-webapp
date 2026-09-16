@@ -38,9 +38,11 @@ export interface MuseumController {
   dispose: () => void;
 }
 
-/** Read-only test/debug hook (Playwright E2E) — never used by app code. */
+/** Test/debug hook (Playwright E2E) — never used by app code. */
 export interface MuseumDebugHandle {
   getCameraPosition: () => { x: number; y: number; z: number };
+  /** Yaw the camera without needing pointer-lock mouse-look (unavailable under headless automation). */
+  setCameraRotationY: (radians: number) => void;
 }
 
 declare global {
@@ -65,6 +67,10 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
 
   const light = new HemisphericLight("light", new Vector3(0.3, 1, 0.2), scene);
   light.intensity = 0.9;
+  // HemisphericLight.groundColor defaults to pure black — anything facing
+  // away from the light direction (the ceiling's underside, wall backs)
+  // would otherwise render black regardless of material color.
+  light.groundColor = new Color3(0.35, 0.34, 0.33);
 
   const camera = new UniversalCamera("camera", new Vector3(0, EYE_HEIGHT, -4), scene);
   camera.minZ = 0.05;
@@ -139,64 +145,93 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
 
   window.__museumDebug = {
     getCameraPosition: () => ({ x: camera.position.x, y: camera.position.y, z: camera.position.z }),
+    setCameraRotationY: (radians) => {
+      camera.rotation.y = radians;
+    },
   };
 
   const WALL_HEIGHT = 3;
   const WALL_THICKNESS = 0.3;
+  const DOORWAY_WIDTH = 3.2;
 
-  function buildPlaceholderShell(manifest: MuseumManifest): void {
+  /**
+   * PLACEHOLDER building shell — still procedural (no hand-authored .glb
+   * exists yet, see DESIGN.md Scope), but now a real walled gallery
+   * instead of open floor plates: solid perimeter walls, open archway
+   * doorways between adjacent rooms, and a ceiling. Generalizes to any
+   * *linear* sequence of same-width rooms (this project's layout); a
+   * non-linear floor plan would need per-edge adjacency processing
+   * instead of the sorted-Z-boundary approach below — real building-shell
+   * work, deferred until a hand-authored asset exists.
+   */
+  function buildGalleryShell(manifest: MuseumManifest): void {
     const roomColors: Record<string, Color3> = {
-      lobby: new Color3(0.22, 0.22, 0.26),
-      "gallery-1": new Color3(0.18, 0.22, 0.2),
-      "gallery-2": new Color3(0.22, 0.19, 0.18),
+      lobby: new Color3(0.55, 0.53, 0.5),
+      "gallery-1": new Color3(0.5, 0.53, 0.5),
+      "gallery-2": new Color3(0.53, 0.5, 0.47),
     };
+    const wallColor = new Color3(0.92, 0.91, 0.88);
+    const ceilingColor = new Color3(0.85, 0.84, 0.82);
 
-    let overallMinX = Infinity;
-    let overallMaxX = -Infinity;
-    let overallMinZ = Infinity;
-    let overallMaxZ = -Infinity;
+    const rooms = Object.values(manifest.rooms);
+    const overallMinX = Math.min(...rooms.map((r) => r.boundary.minX));
+    const overallMaxX = Math.max(...rooms.map((r) => r.boundary.maxX));
+    const overallMinZ = Math.min(...rooms.map((r) => r.boundary.minZ));
+    const overallMaxZ = Math.max(...rooms.map((r) => r.boundary.maxZ));
 
     for (const [roomId, room] of Object.entries(manifest.rooms)) {
       const { minX, maxX, minZ, maxZ } = room.boundary;
-      overallMinX = Math.min(overallMinX, minX);
-      overallMaxX = Math.max(overallMaxX, maxX);
-      overallMinZ = Math.min(overallMinZ, minZ);
-      overallMaxZ = Math.max(overallMaxZ, maxZ);
-
-      const floor = MeshBuilder.CreateGround(
-        `floor:${roomId}`,
-        { width: maxX - minX, height: maxZ - minZ },
-        scene,
-      );
+      const floor = MeshBuilder.CreateGround(`floor:${roomId}`, { width: maxX - minX, height: maxZ - minZ }, scene);
       floor.position.set((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
       floor.checkCollisions = true;
-      const mat = new StandardMaterial(`floor-mat:${roomId}`, scene);
-      mat.diffuseColor = roomColors[roomId] ?? new Color3(0.2, 0.2, 0.2);
-      floor.material = mat;
+      const floorMat = new StandardMaterial(`floor-mat:${roomId}`, scene);
+      floorMat.diffuseColor = roomColors[roomId] ?? new Color3(0.5, 0.5, 0.5);
+      floor.material = floorMat;
     }
 
-    // Outer perimeter wall around the whole building's bounding box — not
-    // real per-room walls (no hand-authored shell asset exists yet, see the
-    // module comment), just enough to stop a visitor walking off the edge
-    // of the world at the building's boundary. Room-to-room walls/doorways
-    // are still open, matching the "no walls between rooms" placeholder.
+    const ceiling = MeshBuilder.CreateGround(
+      "ceiling",
+      { width: overallMaxX - overallMinX, height: overallMaxZ - overallMinZ },
+      scene,
+    );
+    ceiling.position.set((overallMinX + overallMaxX) / 2, WALL_HEIGHT, (overallMinZ + overallMaxZ) / 2);
+    ceiling.rotation.x = Math.PI;
+    const ceilingMat = new StandardMaterial("ceiling-mat", scene);
+    ceilingMat.diffuseColor = ceilingColor;
+    ceilingMat.backFaceCulling = false;
+    ceiling.material = ceilingMat;
+
     const wallMat = new StandardMaterial("wall-mat", scene);
-    wallMat.diffuseColor = new Color3(0.08, 0.08, 0.09);
-    const perimeterWalls: Array<{ name: string; width: number; depth: number; x: number; z: number }> = [
-      { name: "north", width: overallMaxX - overallMinX + WALL_THICKNESS * 2, depth: WALL_THICKNESS, x: (overallMinX + overallMaxX) / 2, z: overallMaxZ },
-      { name: "south", width: overallMaxX - overallMinX + WALL_THICKNESS * 2, depth: WALL_THICKNESS, x: (overallMinX + overallMaxX) / 2, z: overallMinZ },
-      { name: "east", width: WALL_THICKNESS, depth: overallMaxZ - overallMinZ, x: overallMaxX, z: (overallMinZ + overallMaxZ) / 2 },
-      { name: "west", width: WALL_THICKNESS, depth: overallMaxZ - overallMinZ, x: overallMinX, z: (overallMinZ + overallMaxZ) / 2 },
-    ];
-    for (const wall of perimeterWalls) {
-      const box = MeshBuilder.CreateBox(
-        `wall:${wall.name}`,
-        { width: wall.width, height: WALL_HEIGHT, depth: wall.depth },
-        scene,
-      );
-      box.position.set(wall.x, WALL_HEIGHT / 2, wall.z);
+    wallMat.diffuseColor = wallColor;
+
+    function buildWallSegment(name: string, x1: number, z1: number, x2: number, z2: number): void {
+      const width = Math.max(Math.abs(x2 - x1), WALL_THICKNESS);
+      const depth = Math.max(Math.abs(z2 - z1), WALL_THICKNESS);
+      if (width <= WALL_THICKNESS && depth <= WALL_THICKNESS) return; // zero-length segment, doorway ate it all
+      const box = MeshBuilder.CreateBox(`wall:${name}`, { width, height: WALL_HEIGHT, depth }, scene);
+      box.position.set((x1 + x2) / 2, WALL_HEIGHT / 2, (z1 + z2) / 2);
       box.checkCollisions = true;
       box.material = wallMat;
+    }
+
+    // Long side walls spanning the whole building.
+    buildWallSegment("west", overallMinX, overallMinZ, overallMinX, overallMaxZ);
+    buildWallSegment("east", overallMaxX, overallMinZ, overallMaxX, overallMaxZ);
+
+    // Front/back walls at each distinct room boundary along Z: solid at
+    // the two outer ends, an open archway (gap, no lintel) at each
+    // internal boundary shared between two adjacent rooms.
+    const zBoundaries = Array.from(new Set(rooms.flatMap((r) => [r.boundary.minZ, r.boundary.maxZ]))).sort(
+      (a, b) => a - b,
+    );
+    for (const z of zBoundaries) {
+      if (z === overallMinZ || z === overallMaxZ) {
+        buildWallSegment(`end-${z}`, overallMinX, z, overallMaxX, z);
+      } else {
+        const half = DOORWAY_WIDTH / 2;
+        buildWallSegment(`door-${z}-a`, overallMinX, z, -half, z);
+        buildWallSegment(`door-${z}-b`, half, z, overallMaxX, z);
+      }
     }
   }
 
@@ -206,7 +241,7 @@ export function bootMuseum(canvas: HTMLCanvasElement, callbacks: MuseumCallbacks
       if (!manifestRes.ok) throw new Error(`museum-manifest.json failed to load (${manifestRes.status})`);
       const manifest = (await manifestRes.json()) as MuseumManifest;
       if (disposed) return;
-      buildPlaceholderShell(manifest);
+      buildGalleryShell(manifest);
 
       const { spawn } = await roomManager.boot("/content/museum-manifest.json");
       if (disposed) return;

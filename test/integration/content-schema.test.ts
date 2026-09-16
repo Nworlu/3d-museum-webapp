@@ -16,15 +16,27 @@ function isFiniteNumber(v: unknown): v is number {
 function assertExhibitShape(exhibit: ExhibitData, context: string): void {
   expect(typeof exhibit.id, `${context}: id`).toBe("string");
   expect(exhibit.id.length, `${context}: id must be non-empty`).toBeGreaterThan(0);
-  expect(typeof exhibit.modelUrl, `${context}: modelUrl`).toBe("string");
   expect(typeof exhibit.title, `${context}: title`).toBe("string");
   expect(typeof exhibit.description, `${context}: description`).toBe("string");
-  expect(isFiniteNumber(exhibit.scale), `${context}: scale must be a finite number`).toBe(true);
-  expect(exhibit.scale, `${context}: scale must be positive`).toBeGreaterThan(0);
   for (const axis of ["x", "y", "z"] as const) {
     expect(isFiniteNumber(exhibit.position?.[axis]), `${context}: position.${axis} must be a finite number`).toBe(
       true,
     );
+  }
+
+  if (exhibit.kind === "model") {
+    expect(typeof exhibit.modelUrl, `${context}: modelUrl`).toBe("string");
+    expect(isFiniteNumber(exhibit.scale), `${context}: scale must be a finite number`).toBe(true);
+    expect(exhibit.scale, `${context}: scale must be positive`).toBeGreaterThan(0);
+  } else if (exhibit.kind === "painting") {
+    expect(typeof exhibit.imageUrl, `${context}: imageUrl`).toBe("string");
+    expect(isFiniteNumber(exhibit.width), `${context}: width must be a finite number`).toBe(true);
+    expect(exhibit.width, `${context}: width must be positive`).toBeGreaterThan(0);
+    expect(isFiniteNumber(exhibit.height), `${context}: height must be a finite number`).toBe(true);
+    expect(exhibit.height, `${context}: height must be positive`).toBeGreaterThan(0);
+    expect(isFiniteNumber(exhibit.rotationY), `${context}: rotationY must be a finite number`).toBe(true);
+  } else {
+    expect.fail(`${context}: unknown exhibit kind "${(exhibit as ExhibitData).kind}"`);
   }
 }
 

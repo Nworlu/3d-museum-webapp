@@ -1,20 +1,26 @@
 {
   "exhibits": [
     {
-      "id": "damaged-helmet",
-      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb",
-      "position": { "x": -2, "y": 1, "z": 4 },
-      "scale": 1,
-      "title": "Damaged Helmet",
-      "description": "Placeholder exhibit — a PBR-material test model, standing in for a real curated piece."
+      "id": "girl-pearl-earring",
+      "kind": "painting",
+      "imageUrl": "/art/girl-pearl-earring.jpg",
+      "position": { "x": -5.8, "y": 1.6, "z": 5 },
+      "rotationY": -1.5707963267948966,
+      "width": 1.182,
+      "height": 1.4,
+      "title": "Girl with a Pearl Earring",
+      "description": "Johannes Vermeer, c. 1665. Oil on canvas. Public domain (Mauritshuis)."
     },
     {
-      "id": "avocado",
-      "modelUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb",
-      "position": { "x": 2, "y": 1, "z": 4 },
-      "scale": 25,
-      "title": "Still Life Study",
-      "description": "Placeholder exhibit — demonstrates the same duck/boombox model reused across rooms would hit the asset cache; this one is a distinct model."
+      "id": "great-wave",
+      "kind": "painting",
+      "imageUrl": "/art/great-wave.jpg",
+      "position": { "x": 5.8, "y": 1.6, "z": 5 },
+      "rotationY": 1.5707963267948966,
+      "width": 1.4,
+      "height": 0.941,
+      "title": "The Great Wave off Kanagawa",
+      "description": "Katsushika Hokusai, c. 1831. Woodblock print. Public domain."
     }
   ]
 }

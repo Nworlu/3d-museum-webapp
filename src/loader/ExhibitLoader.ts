@@ -5,10 +5,14 @@ import {
   MeshBuilder,
   Scene,
   StandardMaterial,
+  Texture,
   TransformNode,
 } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
-import type { ExhibitData, RoomContent } from "../types";
+import type { ExhibitData, ModelExhibit, PaintingExhibit, RoomContent } from "../types";
+
+const FRAME_BORDER = 0.08;
+const FRAME_DEPTH = 0.04;
 
 interface LoadedRoom {
   root: TransformNode;
@@ -26,6 +30,7 @@ interface LoadedRoom {
 export class ExhibitLoader {
   private readonly scene: Scene;
   private readonly assetCache = new Map<string, AssetContainer>();
+  private readonly textureCache = new Map<string, Texture>();
   private readonly generation = new Map<string, number>();
   private readonly loadedRooms = new Map<string, LoadedRoom>();
 
@@ -84,25 +89,86 @@ export class ExhibitLoader {
 
   private async importExhibit(exhibit: ExhibitData, parent: TransformNode): Promise<void> {
     try {
-      let container = this.assetCache.get(exhibit.modelUrl);
-      if (!container) {
-        container = await LoadAssetContainerAsync(exhibit.modelUrl, this.scene);
-        this.assetCache.set(exhibit.modelUrl, container);
-      }
-      const instance = container.instantiateModelsToScene((name) => name, true);
-      const root = (instance.rootNodes[0] as TransformNode | undefined) ?? new TransformNode(exhibit.id, this.scene);
-      root.parent = parent;
-      root.position.set(exhibit.position.x, exhibit.position.y, exhibit.position.z);
-      root.scaling.setAll(exhibit.scale);
-      for (const node of instance.rootNodes) {
-        for (const mesh of node.getChildMeshes(false)) {
-          mesh.metadata = { exhibitTitle: exhibit.title, exhibitDescription: exhibit.description };
-          mesh.isPickable = true;
-        }
+      if (exhibit.kind === "painting") {
+        await this.importPainting(exhibit, parent);
+      } else {
+        await this.importModel(exhibit, parent);
       }
     } catch (err) {
       console.error(`[ExhibitLoader] exhibit "${exhibit.id}" failed to load, showing placeholder:`, err);
       this.createPlaceholder(exhibit, parent);
+    }
+  }
+
+  private async importModel(exhibit: ModelExhibit, parent: TransformNode): Promise<void> {
+    let container = this.assetCache.get(exhibit.modelUrl);
+    if (!container) {
+      container = await LoadAssetContainerAsync(exhibit.modelUrl, this.scene);
+      this.assetCache.set(exhibit.modelUrl, container);
+    }
+    const instance = container.instantiateModelsToScene((name) => name, true);
+    const root = (instance.rootNodes[0] as TransformNode | undefined) ?? new TransformNode(exhibit.id, this.scene);
+    root.parent = parent;
+    root.position.set(exhibit.position.x, exhibit.position.y, exhibit.position.z);
+    root.scaling.setAll(exhibit.scale);
+    for (const node of instance.rootNodes) {
+      for (const mesh of node.getChildMeshes(false)) {
+        mesh.metadata = { exhibitTitle: exhibit.title, exhibitDescription: exhibit.description };
+        mesh.isPickable = true;
+      }
+    }
+  }
+
+  /** A framed image plane mounted flush against a wall. */
+  private async importPainting(exhibit: PaintingExhibit, parent: TransformNode): Promise<void> {
+    let texture = this.textureCache.get(exhibit.imageUrl);
+    if (!texture) {
+      texture = await new Promise<Texture>((resolve, reject) => {
+        const tex = new Texture(
+          exhibit.imageUrl,
+          this.scene,
+          undefined,
+          undefined,
+          undefined,
+          () => resolve(tex),
+          (message) => reject(new Error(message ?? `failed to load texture ${exhibit.imageUrl}`)),
+        );
+      });
+      this.textureCache.set(exhibit.imageUrl, texture);
+    }
+
+    const root = new TransformNode(`painting:${exhibit.id}`, this.scene);
+    root.parent = parent;
+    root.position.set(exhibit.position.x, exhibit.position.y, exhibit.position.z);
+    root.rotation.y = exhibit.rotationY;
+
+    const frame = MeshBuilder.CreateBox(
+      `frame:${exhibit.id}`,
+      { width: exhibit.width + FRAME_BORDER * 2, height: exhibit.height + FRAME_BORDER * 2, depth: FRAME_DEPTH },
+      this.scene,
+    );
+    frame.parent = root;
+    frame.position.z = FRAME_DEPTH / 2;
+    const frameMat = new StandardMaterial(`frame-mat:${exhibit.id}`, this.scene);
+    frameMat.diffuseColor = new Color3(0.18, 0.13, 0.08);
+    frame.material = frameMat;
+
+    const picture = MeshBuilder.CreatePlane(
+      `picture:${exhibit.id}`,
+      { width: exhibit.width, height: exhibit.height },
+      this.scene,
+    );
+    picture.parent = root;
+    picture.position.z = -0.001; // in front of the frame (toward the room interior)
+    const pictureMat = new StandardMaterial(`picture-mat:${exhibit.id}`, this.scene);
+    pictureMat.emissiveTexture = texture; // evenly lit, like real gallery lighting
+    pictureMat.disableLighting = true;
+    pictureMat.backFaceCulling = true;
+    picture.material = pictureMat;
+
+    for (const mesh of [frame, picture]) {
+      mesh.metadata = { exhibitTitle: exhibit.title, exhibitDescription: exhibit.description };
+      mesh.isPickable = true;
     }
   }
 

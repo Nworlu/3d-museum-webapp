@@ -205,6 +205,59 @@ ExhibitLoader.unloadRoom(farRoomId) → dispose meshes, free textures
    shipping new client code") could silently fail to reach visitors
    behind normal static-hosting/CDN caching. Standard static-site
    cache-busting pattern. [Layer 1]
+8. **Exhibits are a discriminated union (`kind: "model" | "painting"`),
+   not just glTF models.** Real museum content skews toward 2D art on
+   walls, not sculptures on plinths — `PaintingExhibit` (an image plane +
+   frame, mounted flush against a wall with an author-specified
+   `rotationY`) is the more authentic default, while `ModelExhibit` (the
+   original glTF-on-a-plinth path) stays available for 3D pieces.
+   `ExhibitLoader.importExhibit` branches on `kind`; both share the
+   generation-guard/placeholder-on-failure machinery from Key Decisions
+   2 and 5. The v1 content set uses six well-known, unambiguously
+   public-domain paintings (pre-1900 or explicitly public-domain,
+   sourced from Wikimedia Commons) as real (not placeholder) exhibit
+   content — see Content sourcing below.
+9. **The placeholder building shell now has real walls, doorways, and a
+   ceiling** (`buildGalleryShell`, `src/babylon/bootMuseum.ts`) instead of
+   open floor plates with no room-to-room separation. Still procedural
+   (no hand-authored `.glb` exists), and still generalizes only to a
+   *linear* sequence of rooms (this project's layout) — but it fixed a
+   real bug the open-plan version had: with no wall geometry at all, a
+   visitor moving fast enough could walk straight off the edge of the
+   world, since there was nothing to collide with beyond the building's
+   nominal boundary. `T8`'s collision E2E test (`test/e2e/collision.spec.ts`)
+   exercises this directly.
+
+### Content sourcing
+
+Exhibit artwork is six widely-reproduced, unambiguously public-domain
+paintings — *The Starry Night* (Van Gogh, 1889), *Girl with a Pearl
+Earring* (Vermeer, c. 1665), *The Great Wave off Kanagawa* (Hokusai, c.
+1831), *Mona Lisa* (da Vinci, c. 1503), *Impression, Sunrise* (Monet,
+1872), *The Birth of Venus* (Botticelli, c. 1486) — downloaded from
+Wikimedia Commons and hosted locally under `public/art/` (consistent
+with Key Decision #1: content served from the app's own static host, not
+hotlinked). Chosen for being old enough that public-domain status isn't
+ambiguous in any jurisdiction, unlike anything from the 20th century
+onward.
+
+**Incident (2026-09-16):** the first download attempt used each
+painting's Commons file-description URL, which redirects to the
+*original master scan* — for the Google Art Project pieces, a
+multi-hundred-megabyte gigapixel file. A 30-second `curl --max-time`
+silently truncated those downloads mid-stream. Every tool in the local
+pipeline (`sips`, `ffmpeg`, Python's PIL) decoded the truncated JPEG
+"successfully" — valid header, correct reported dimensions — and
+silently gray-filled the scanlines past the truncation point, per
+standard libjpeg behavior for a stream missing its EOI marker. The
+failure was invisible at every build step and only showed up as a flat
+gray rectangle in the running app. Fixed by using the MediaWiki API's
+`iiurlwidth` parameter to request a properly pre-sized thumbnail
+rendition instead of guessing at the master URL. Regression-tested going
+forward: `test/integration/art-assets.test.ts` checks every art asset's
+file size against a floor and verifies its trailing JPEG EOI marker
+(`FF D9`) is present — a dependency-free way to catch a truncated
+download before it reaches the running app again.
 
 ## Edge cases
 
