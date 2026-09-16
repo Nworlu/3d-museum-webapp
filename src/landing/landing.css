@@ -244,25 +244,91 @@
 }
 .landing-page .hero-ctas { margin-top: 32px; display: flex; gap: 14px; flex-wrap: wrap; }
 
-/* salon hang: staggered real paintings, like a gallery wall */
+/* salon hang: a curated torn-paper collage of the real paintings, like a
+   curator's mood-board — colored paper backing peeks from behind each
+   torn-edge cutout, with a subtle grain texture and two tape accents. */
 .landing-page .salon {
   position: relative;
   height: 420px;
 }
-.landing-page .salon img {
+.landing-page .salon::before {
+  /* paper grain: a well-worn CSS trick — inline SVG fractal noise as a
+     background image, no asset file needed. Self-limiting in dark mode
+     since multiply against a near-black ground barely shows. */
+  content: "";
   position: absolute;
-  border-radius: 2px;
-  box-shadow: 0 18px 40px var(--shadow);
-  border: 6px solid var(--card);
-  object-fit: cover;
-  transform: rotate(var(--rot, 0deg));
+  inset: -24px;
+  pointer-events: none;
+  opacity: 0.16;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-.landing-page .salon .p1 { width: 178px; height: 220px; top: 8px; left: 30px; --rot: -4deg; z-index: 3; --settle-delay: 0.05s; }
-.landing-page .salon .p2 { width: 150px; height: 190px; top: 130px; left: 190px; --rot: 3deg; z-index: 4; --settle-delay: 0.2s; }
-.landing-page .salon .p3 { width: 140px; height: 176px; top: 0; left: 320px; --rot: -2deg; z-index: 2; --settle-delay: 0.15s; }
-.landing-page .salon .p4 { width: 130px; height: 164px; top: 210px; left: 40px; --rot: 2deg; z-index: 1; --settle-delay: 0.3s; }
-.landing-page .salon .p5 { width: 150px; height: 118px; top: 250px; left: 300px; --rot: 4deg; z-index: 2; --settle-delay: 0.35s; }
-.landing-page .salon .p6 { width: 118px; height: 150px; top: 8px; left: 455px; --rot: 3deg; z-index: 1; --settle-delay: 0.25s; }
+.landing-page .salon-piece { position: absolute; }
+.landing-page .salon-piece .paper {
+  position: absolute;
+  inset: -13px;
+  border-radius: 1px;
+  transform: rotate(var(--paper-rot, 8deg));
+}
+.landing-page .salon-piece .photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: rotate(var(--rot, 0deg));
+  filter: drop-shadow(0 14px 22px var(--shadow));
+}
+.landing-page .paper-brass { background: var(--brass); }
+.landing-page .paper-oxblood { background: var(--oxblood); }
+.landing-page .paper-stone { background: var(--stone); }
+
+/* Three jagged-edge variants (hand-authored zigzag polygons), cycled across
+   pieces so no two neighbors share the same torn silhouette. */
+.landing-page .torn-1 {
+  clip-path: polygon(
+    3% 2%, 15% 5%, 27% 1%, 40% 4%, 53% 0%, 66% 3%, 79% 0%, 92% 4%, 100% 9%,
+    96% 22%, 100% 35%, 97% 48%, 100% 61%, 96% 74%, 100% 87%, 95% 100%,
+    82% 96%, 69% 100%, 56% 97%, 43% 100%, 30% 96%, 17% 100%, 4% 97%,
+    0% 85%, 4% 72%, 0% 59%, 3% 46%, 0% 33%, 4% 20%, 0% 10%
+  );
+}
+.landing-page .torn-2 {
+  clip-path: polygon(
+    0% 6%, 10% 2%, 20% 6%, 32% 1%, 44% 5%, 56% 0%, 68% 4%, 80% 1%, 90% 5%, 100% 0%,
+    100% 14%, 96% 27%, 100% 40%, 97% 53%, 100% 66%, 95% 79%, 100% 92%,
+    90% 100%, 78% 96%, 66% 100%, 54% 97%, 42% 100%, 30% 96%, 18% 100%, 6% 96%,
+    0% 100%, 3% 87%, 0% 74%, 4% 61%, 0% 48%, 3% 35%, 0% 22%
+  );
+}
+.landing-page .torn-3 {
+  clip-path: polygon(
+    4% 0%, 16% 4%, 28% 0%, 41% 5%, 54% 1%, 67% 4%, 80% 0%, 93% 3%, 100% 10%,
+    97% 23%, 100% 36%, 95% 49%, 100% 62%, 96% 75%, 100% 88%, 94% 100%,
+    81% 97%, 68% 100%, 55% 96%, 42% 100%, 29% 97%, 16% 100%, 3% 96%,
+    0% 84%, 4% 71%, 0% 58%, 3% 45%, 0% 32%, 4% 19%, 0% 7%
+  );
+}
+
+/* washi-tape accents: small translucent strips laid across two seams */
+.landing-page .tape {
+  position: absolute;
+  width: 58px;
+  height: 20px;
+  background: color-mix(in srgb, var(--card) 75%, transparent);
+  box-shadow: 0 1px 3px var(--shadow);
+  z-index: 5;
+}
+.landing-page .tape-1 { top: 186px; left: 158px; transform: rotate(-11deg); }
+.landing-page .tape-2 { top: 226px; left: 408px; transform: rotate(9deg); }
+
+.landing-page .salon .p1 { width: 178px; height: 220px; top: 8px; left: 30px; --rot: -4deg; --paper-rot: 4deg; z-index: 3; --settle-delay: 0.05s; }
+.landing-page .salon .p2 { width: 150px; height: 190px; top: 130px; left: 190px; --rot: 3deg; --paper-rot: -6deg; z-index: 4; --settle-delay: 0.2s; }
+.landing-page .salon .p3 { width: 140px; height: 176px; top: 0; left: 320px; --rot: -2deg; --paper-rot: 7deg; z-index: 2; --settle-delay: 0.15s; }
+.landing-page .salon .p4 { width: 130px; height: 164px; top: 210px; left: 40px; --rot: 2deg; --paper-rot: -5deg; z-index: 1; --settle-delay: 0.3s; }
+.landing-page .salon .p5 { width: 150px; height: 118px; top: 250px; left: 300px; --rot: 4deg; --paper-rot: -4deg; z-index: 2; --settle-delay: 0.35s; }
+.landing-page .salon .p6 { width: 118px; height: 150px; top: 8px; left: 455px; --rot: 3deg; --paper-rot: -6deg; z-index: 1; --settle-delay: 0.25s; }
 
 @media (max-width: 900px) {
   .landing-page .hero { grid-template-columns: 1fr; padding-block: 52px 60px; }
@@ -273,6 +339,7 @@
   .landing-page .salon .p4 { width: 96px; height: 120px; left: 30px; top: 150px; }
   .landing-page .salon .p5 { width: 108px; height: 84px; left: 210px; top: 190px; }
   .landing-page .salon .p6 { display: none; }
+  .landing-page .tape { display: none; }
 }
 
 /* ---------------- ARTIST STRIP (infinite marquee) ---------------- */

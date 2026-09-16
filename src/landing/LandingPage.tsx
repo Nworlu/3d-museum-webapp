@@ -300,12 +300,32 @@ export function LandingPage() {
             </div>
           </div>
           <div className="salon" aria-hidden="true">
-            <img className="p1" src="/art/starry-night.jpg" alt="" />
-            <img className="p2" src="/art/girl-pearl-earring.jpg" alt="" />
-            <img className="p3" src="/art/great-wave.jpg" alt="" />
-            <img className="p4" src="/art/mona-lisa.jpg" alt="" />
-            <img className="p5" src="/art/impression-sunrise.jpg" alt="" />
-            <img className="p6" src="/art/birth-of-venus.jpg" alt="" />
+            <div className="salon-piece p1">
+              <div className="paper paper-oxblood torn-2" />
+              <img className="photo torn-1" src="/art/starry-night.jpg" alt="" />
+            </div>
+            <div className="salon-piece p2">
+              <div className="paper paper-brass torn-3" />
+              <img className="photo torn-2" src="/art/girl-pearl-earring.jpg" alt="" />
+            </div>
+            <div className="salon-piece p3">
+              <div className="paper paper-stone torn-1" />
+              <img className="photo torn-3" src="/art/great-wave.jpg" alt="" />
+            </div>
+            <div className="tape tape-1" />
+            <div className="salon-piece p4">
+              <div className="paper paper-brass torn-1" />
+              <img className="photo torn-2" src="/art/mona-lisa.jpg" alt="" />
+            </div>
+            <div className="salon-piece p5">
+              <div className="paper paper-oxblood torn-3" />
+              <img className="photo torn-1" src="/art/impression-sunrise.jpg" alt="" />
+            </div>
+            <div className="tape tape-2" />
+            <div className="salon-piece p6">
+              <div className="paper paper-stone torn-2" />
+              <img className="photo torn-3" src="/art/birth-of-venus.jpg" alt="" />
+            </div>
           </div>
         </section>
 
