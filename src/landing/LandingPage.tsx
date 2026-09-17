@@ -63,7 +63,7 @@ export function LandingPage() {
 
     // Scroll-reveal: sections fade/lift into place as they enter the
     // viewport, like gallery lights coming up room by room. Elements are
-    // fully visible by default in the CSS — reveal-ready is only added here,
+    // fully visible by default in the CSS reveal-ready is only added here,
     // after JS has definitely run, so there's no window where content
     // depends on JS to be seen at all.
     const targets = document.querySelectorAll(".landing-page .reveal");
@@ -184,7 +184,7 @@ export function LandingPage() {
         items.forEach((item) => {
           const rect = item.el.getBoundingClientRect();
           // Scrub window: starts as the paragraph's top crosses 85% of
-          // viewport height, finishes as its bottom crosses 45% — so it
+          // viewport height, finishes as its bottom crosses 45% so it
           // lights up while passing through the lower-middle of the screen,
           // roughly where a reader's eye actually is.
           const startY = vh * 0.85;
@@ -288,7 +288,7 @@ export function LandingPage() {
             </h1>
             <p className="sub">
               Walk the halls of a museum that exists only in a browser tab. The Starry Night, the Mona Lisa, and four
-              more masters — rendered in real time, room by room, with nothing to install and no line at the door.
+              more masters rendered in real time, room by room, with nothing to install and no line at the door.
             </p>
             <div className="hero-ctas">
               <a className="btn btn-primary" href="/museum">
@@ -309,7 +309,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ARTIST STRIP — infinite marquee, paused on hover */}
+        {/* ARTIST STRIP infinite marquee, paused on hover */}
         <section className="wrap artists framed reveal">
           <span className="label">Featured in this hang</span>
           <div className="marquee-wrap">
@@ -344,7 +344,7 @@ export function LandingPage() {
             </h2>
             <p className="lede scrub" data-scrub="true">
               Every exhibit here is data, not code. A curator picks a room and a wall, uploads an image, and the
-              museum figures out the placement — nothing about the renderer has to change, and nothing has to be
+              museum figures out the placement nothing about the renderer has to change, and nothing has to be
               rebuilt.
             </p>
             <dl className="grid-2x2">
@@ -352,7 +352,7 @@ export function LandingPage() {
                 <dt>
                   <CompassIcon size={18} className="dt-icon" /> Walk &amp; Look Around
                 </dt>
-                <dd>WASD to move, mouse to look — the same controls as any first-person walkthrough.</dd>
+                <dd>WASD to move, mouse to look the same controls as any first-person walkthrough.</dd>
               </div>
               <div>
                 <dt>
@@ -370,7 +370,7 @@ export function LandingPage() {
                 <dt>
                   <ShieldIcon size={18} className="dt-icon" /> A Real Curator Dashboard
                 </dt>
-                <dd>Add or remove an exhibit from a password-protected admin page — no JSON, no redeploy.</dd>
+                <dd>Add or remove an exhibit from a password-protected admin page no JSON, no redeploy.</dd>
               </div>
             </dl>
           </div>
@@ -406,7 +406,7 @@ export function LandingPage() {
               </div>
               <div className="acc-item">
                 <h3>Perimeter Collision</h3>
-                <p>Real walls and open archways — you can walk fast, but never off the edge of the building.</p>
+                <p>Real walls and open archways you can walk fast, but never off the edge of the building.</p>
               </div>
               <div className="acc-item">
                 <h3>Content-Hash Versioning</h3>
@@ -451,7 +451,7 @@ export function LandingPage() {
           <h2 style={{ marginTop: 14 }}>The Collection</h2>
           <p>
             Six works, chosen for one reason above all others: they are unambiguously, permanently in the public
-            domain — old enough that no jurisdiction's copyright term touches them.
+            domain old enough that no jurisdiction's copyright term touches them.
           </p>
         </section>
         <div className="wrap collection-grid">
@@ -475,7 +475,7 @@ export function LandingPage() {
           ))}
         </div>
 
-        {/* STATS — numbers count up from 0 when scrolled into view */}
+        {/* STATS numbers count up from 0 when scrolled into view */}
         <div className="wrap stats framed reveal">
           <div className="stat">
             <FrameIcon size={22} className="stat-icon" />
@@ -503,7 +503,7 @@ export function LandingPage() {
         <section className="wrap visit-head framed reveal" id="visit">
           <span className="label">Access</span>
           <h2 style={{ marginTop: 14 }}>Three Ways to Visit</h2>
-          <p>No membership tiers here — this is a status report on where the museum actually stands, not a sales page.</p>
+          <p>No membership tiers here this is a status report on where the museum actually stands, not a sales page.</p>
         </section>
         <div className="wrap visit-grid">
           <div className="visit-card reveal">
@@ -519,7 +519,7 @@ export function LandingPage() {
           </div>
           <div className="visit-card reveal">
             <PhoneIcon size={26} className="visit-icon" />
-            <span className="status status-shipped">Shipped</span>
+            <span className="status status-progress">In Progress</span>
             <h3>On Tablet &amp; Phone</h3>
             <p className="desc">Full walkthrough on touch too: drag to look, an on-screen joystick to walk, tap to inspect.</p>
             <ul>
@@ -532,7 +532,7 @@ export function LandingPage() {
             <VRIcon size={26} className="visit-icon" />
             <span className="status status-planned">Designed For</span>
             <h3>In VR</h3>
-            <p className="desc">Babylon.js ships WebXR support out of the box — the room-streaming architecture was built to carry it.</p>
+            <p className="desc">Babylon.js ships WebXR support out of the box the room-streaming architecture was built to carry it.</p>
             <ul>
               <li>No headset-specific rebuild needed</li>
               <li>Depth sensing supported upstream</li>
@@ -554,7 +554,7 @@ export function LandingPage() {
                 Is this really running in a browser? <span className="icon">+</span>
               </summary>
               <p>
-                Yes — no plugin, no download. Babylon.js renders the whole scene with WebGL, the same technology your
+                Yes no plugin, no download. Babylon.js renders the whole scene with WebGL, the same technology your
                 browser already uses for video and canvas graphics.
               </p>
             </details>
@@ -563,7 +563,7 @@ export function LandingPage() {
                 Can a new painting be added without touching code? <span className="icon">+</span>
               </summary>
               <p>
-                Yes — through an actual admin dashboard, not a text editor. A curator logs in, picks a room and a
+                Yes through an actual admin dashboard, not a text editor. A curator logs in, picks a room and a
                 wall, uploads an image, and the museum computes the placement and frame size itself. It's on the wall
                 on the next visit.
               </p>
@@ -573,7 +573,7 @@ export function LandingPage() {
                 Is the art really public domain? <span className="icon">+</span>
               </summary>
               <p>
-                All six works were chosen specifically because they're old enough — 1500s to 1916 — that
+                All six works were chosen specifically because they're old enough 1500s to 1916 that
                 public-domain status isn't ambiguous in any jurisdiction. Sourced from Wikimedia Commons.
               </p>
             </details>
@@ -582,7 +582,7 @@ export function LandingPage() {
                 What is Babylon.js? <span className="icon">+</span>
               </summary>
               <p>
-                An open-source 3D engine for the web — the same category as Three.js, built by Microsoft's team, used
+                An open-source 3D engine for the web the same category as Three.js, built by Microsoft's team, used
                 for games, product configurators, and virtual showrooms.
               </p>
             </details>
@@ -590,14 +590,14 @@ export function LandingPage() {
               <summary>
                 Does it work on my phone? <span className="icon">+</span>
               </summary>
-              <p>Yes — drag to look around, use the on-screen joystick to walk, and tap a piece to inspect it. Same museum, same collision, touch-native controls.</p>
+              <p>Yes drag to look around, use the on-screen joystick to walk, and tap a piece to inspect it. Same museum, same collision, touch-native controls.</p>
             </details>
-            <details className="faq">
+            {/* <details className="faq">
               <summary>
                 Where's the code? <span className="icon">+</span>
               </summary>
-              <p>This is an active build — architecture, tests, and the full design doc exist, and the plan is to open it up once the walkthrough is complete on every device.</p>
-            </details>
+              <p>This is an active build architecture, tests, and the full design doc exist, and the plan is to open it up once the walkthrough is complete on every device.</p>
+            </details> */}
           </div>
         </section>
 
@@ -629,7 +629,7 @@ export function LandingPage() {
                 The Unbound Museum
               </a>
               <p>
-                A walkable 3D museum rendered entirely in the browser with Babylon.js and React — built room by room,
+                A walkable 3D museum rendered entirely in the browser with Babylon.js and React built room by room,
                 with the exhibits driven by data, not code.
               </p>
             </div>

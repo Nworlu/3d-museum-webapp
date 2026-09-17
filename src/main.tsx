@@ -26,7 +26,7 @@ const router = createBrowserRouter([
     Component: LandingPage,
   },
   {
-    path: "admin",
+    path: "/admin",
     Component: AdminPage,
   },
   {
